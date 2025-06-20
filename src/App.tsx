@@ -8,6 +8,7 @@ import { DailyOperations } from './pages/DailyOperations';
 import { Closures } from './pages/Closures';
 import { Stores } from './pages/Stores';
 import { Users } from './pages/Users';
+import Settings from './pages/Settings';
 
 function App() {
   const { user, loading } = useAuth();
@@ -15,7 +16,10 @@ function App() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando...</p>
+        </div>
       </div>
     );
   }
@@ -28,15 +32,14 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
           <Route path="daily-operations" element={<DailyOperations />} />
           <Route path="closures" element={<Closures />} />
           <Route path="stores" element={<Stores />} />
           <Route path="users" element={<Users />} />
-          <Route path="reports" element={<div>Reportes - En desarrollo</div>} />
-          <Route path="settings" element={<div>Configuración - En desarrollo</div>} />
+          <Route path="settings" element={<Settings />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );

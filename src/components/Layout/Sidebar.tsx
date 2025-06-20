@@ -9,7 +9,10 @@ import {
   Users,
   Calculator,
   LogOut,
-  Activity
+  Activity,
+  Home,
+  Calendar,
+  Building2
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasPermission, canManageUsers } from '../../lib/permissions';
@@ -17,50 +20,49 @@ import { hasPermission, canManageUsers } from '../../lib/permissions';
 export const Sidebar: React.FC = () => {
   const { user, signOut } = useAuth();
 
-  const navigation = [
-    { 
-      name: 'Dashboard', 
-      href: '/', 
-      icon: LayoutDashboard,
+  const menuItems = [
+    {
+      label: 'Dashboard',
+      icon: Home,
+      path: '/dashboard',
       permission: 'dashboard:view'
     },
-    { 
-      name: 'Operaciones Diarias', 
-      href: '/daily-operations', 
-      icon: Activity,
+    {
+      label: 'Operaciones Diarias',
+      icon: Calendar,
+      path: '/daily-operations',
       permission: 'daily_operations:view'
     },
-    { 
-      name: 'Cierres Diarios', 
-      href: '/closures', 
+    {
+      label: 'Cierres',
       icon: FileText,
+      path: '/closures',
       permission: 'closures:view'
     },
-    { 
-      name: 'Tiendas', 
-      href: '/stores', 
-      icon: Store,
+    {
+      label: 'Tiendas',
+      icon: Building2,
+      path: '/stores',
       permission: 'stores:view'
     },
-    { 
-      name: 'Usuarios', 
-      href: '/users', 
+    {
+      label: 'Usuarios',
       icon: Users,
-      permission: 'users:view',
-      requiresUserManagement: true
+      path: '/users',
+      permission: 'users:view'
     },
-    { 
-      name: 'Reportes', 
-      href: '/reports', 
+    {
+      label: 'Reportes',
       icon: BarChart3,
+      path: '/reports',
       permission: 'reports:view'
     },
-    { 
-      name: 'Configuración', 
-      href: '/settings', 
+    {
+      label: 'Configuración',
       icon: Settings,
+      path: '/settings',
       permission: 'settings:view'
-    },
+    }
   ];
 
   const handleSignOut = async () => {
@@ -68,16 +70,9 @@ export const Sidebar: React.FC = () => {
   };
 
   // Filtrar navegación según permisos del usuario
-  const filteredNavigation = navigation.filter(item => {
+  const filteredNavigation = menuItems.filter(item => {
     if (!user) return false;
-    
-    // Verificar si requiere gestión de usuarios
-    if (item.requiresUserManagement && !canManageUsers(user)) {
-      return false;
-    }
-    
-    // Verificar permiso específico
-    return hasPermission(user, item.permission as any);
+    return hasPermission(user, item.permission);
   });
 
   return (
@@ -90,8 +85,8 @@ export const Sidebar: React.FC = () => {
       <nav className="flex-1 px-4 py-6 space-y-2">
         {filteredNavigation.map((item) => (
           <NavLink
-            key={item.name}
-            to={item.href}
+            key={item.label}
+            to={item.path}
             className={({ isActive }) =>
               `flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
                 isActive
@@ -101,7 +96,7 @@ export const Sidebar: React.FC = () => {
             }
           >
             <item.icon className="w-5 h-5 mr-3" />
-            {item.name}
+            {item.label}
           </NavLink>
         ))}
       </nav>

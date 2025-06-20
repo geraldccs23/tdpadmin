@@ -195,4 +195,42 @@ export const getAllRoles = (): Array<{ value: User['role']; label: string; descr
     label: role.name,
     description: role.description
   }));
+};
+
+export const permissions = {
+  dashboard: {
+    read: ['director', 'admin', 'manager', 'cashier', 'assistant'],
+    write: ['director', 'admin', 'manager'],
+    delete: ['director', 'admin']
+  },
+  'daily-operations': {
+    read: ['director', 'admin', 'manager', 'cashier'],
+    write: ['director', 'admin', 'manager', 'cashier'],
+    delete: ['director', 'admin']
+  },
+  closures: {
+    read: ['director', 'admin', 'manager', 'cashier'],
+    write: ['director', 'admin', 'manager', 'cashier'],
+    delete: ['director', 'admin']
+  },
+  stores: {
+    read: ['director', 'admin', 'manager'],
+    write: ['director', 'admin'],
+    delete: ['director', 'admin']
+  },
+  users: {
+    read: ['director', 'admin'],
+    write: ['director', 'admin'],
+    delete: ['director', 'admin']
+  },
+  reports: {
+    read: ['director', 'admin', 'manager'],
+    write: ['director', 'admin'],
+    delete: ['director', 'admin']
+  },
+  settings: {
+    read: ['director', 'admin'],
+    write: ['director', 'admin'],
+    delete: ['director', 'admin']
+  }
 }; 
