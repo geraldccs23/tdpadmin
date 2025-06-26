@@ -158,9 +158,9 @@ export const ROLE_PERMISSIONS: Record<User['role'], RolePermissions> = {
   }
 };
 
-export const hasPermission = (user: User, permission: Permission): boolean => {
-  const rolePermissions = ROLE_PERMISSIONS[user.role];
-  return rolePermissions.permissions.includes(permission);
+export const hasPermission = (user: User | null | undefined, permission: string): boolean => {
+  if (!user || !user.role) return false;
+  return ROLE_PERMISSIONS[user.role]?.permissions.includes(permission);
 };
 
 export const canAccessStore = (user: User, storeId: string): boolean => {

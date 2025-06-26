@@ -38,12 +38,14 @@ export const Users: React.FC = () => {
 
   const loadUsers = async () => {
     try {
-      const storedData = localStorage.getItem('financial-dashboard-data');
-      if (storedData) {
-        const data = JSON.parse(storedData);
-        const usersData = data.users || [];
-        setUsers(usersData);
-      }
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
+  
+      if (error) throw error;
+  
+      setUsers(data);
     } catch (error) {
       console.error('Error loading users:', error);
     } finally {
@@ -93,25 +95,75 @@ export const Users: React.FC = () => {
       const storedData = localStorage.getItem('financial-dashboard-data');
       const data = storedData ? JSON.parse(storedData) : { users: [], stores: [] };
       
-      if (editingUser) {
-        // Update existing user
-        const updatedUsers = data.users.map((user: UserType) => 
-          user.id === editingUser.id 
-            ? { ...user, ...newUser, updated_at: new Date().toISOString() }
-            : user
-        );
-        data.users = updatedUsers;
-        setUsers(updatedUsers);
-      } else {
-        // Create new user
-        const newUserWithId = {
-          ...newUser,
-          id: Date.now().toString(),
-          created_at: new Date().toISOString(),
-        };
-        data.users.push(newUserWithId);
-        setUsers([...users, newUserWithId]);
+      try {
+        if (editingUser) {
+          // UPDATE usuario existente
+          const { error: updateError } = await supabase
+            .from('users')
+            .update({
+              full_name: formData.full_name,
+              role: formData.role,
+              assigned_store_id: formData.assigned_store_id || null,
+              phone: formData.phone,
+              is_active: formData.is_active,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', editingUser.id);
+      
+          if (updateError) throw updateError;
+        } else {
+          // CREAR usuario con email + password
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email: formData.email,
+            password: formData.password,
+            options: {
+              data: { full_name: formData.full_name }
+            }
+          });
+      
+          if (signUpError) throw signUpError;
+      
+          const userId = signUpData.user?.id;
+      
+          if (!userId) throw new Error('No se pudo obtener el ID del nuevo usuario.');
+      
+          const { error: insertError } = await supabase.from('users').insert({
+            id: userId,
+            email: formData.email,
+            full_name: formData.full_name,
+            role: formData.role,
+            assigned_store_id: formData.assigned_store_id || null,
+            phone: formData.phone,
+            is_active: formData.is_active,
+            created_at: new Date().toISOString()
+          });
+      
+          if (insertError) throw insertError;
+        }
+      
+        // Reload data
+        await loadUsers();
+      
+        setFormData({
+          email: '',
+          full_name: '',
+          role: 'cajero',
+          assigned_store_id: '',
+          phone: '',
+          is_active: true,
+          password: '',
+          confirm_password: '',
+        });
+        setShowForm(false);
+        setEditingUser(null);
+      
+        alert(editingUser ? 'Usuario actualizado exitosamente' : 'Usuario creado exitosamente');
+      
+      } catch (error) {
+        console.error('Error al guardar el usuario:', error);
+        alert('Error al guardar el usuario');
       }
+      
 
       localStorage.setItem('financial-dashboard-data', JSON.stringify(data));
       

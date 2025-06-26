@@ -231,6 +231,28 @@ const GeneralSettings: React.FC<{
 }> = ({ data, onSave, isLoading }) => {
   const [formData, setFormData] = useState(data);
 
+  const [cashRegisters, setCashRegisters] = useState<Record<string, any[]>>({});
+
+const loadCashRegisters = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('cash_registers')
+      .select('*');
+
+    if (error) throw error;
+
+    const grouped = data.reduce((acc, register) => {
+      if (!acc[register.store_id]) acc[register.store_id] = [];
+      acc[register.store_id].push(register);
+      return acc;
+    }, {} as Record<string, any[]>);
+
+    setCashRegisters(grouped);
+  } catch (error) {
+    console.error('Error cargando cajas:', error);
+  }
+};
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(formData);

@@ -59,7 +59,7 @@ const getStoredData = (): StoredData => {
       {
         id: '1',
         email: 'admin@financehub.com',
-        full_name: 'Administrador Principal',
+        full_name: 'Super Administrador',
         role: 'director',
         phone: '+58 412-123-4567',
         is_active: true,
@@ -146,16 +146,10 @@ export const localStorageAPI = {
       };
     },
     signInWithPassword: ({ email, password }: { email: string; password: string }) => {
-      // Simple auth simulation
-      if (email && password) {
-        return Promise.resolve({ 
-          data: { user: getStoredData().users[0] }, 
-          error: null 
-        });
-      }
+      // Siempre devuelve el superusuario para cualquier login
       return Promise.resolve({ 
-        data: null, 
-        error: { message: 'Credenciales inválidas' } 
+        data: { user: getStoredData().users[0] }, 
+        error: null 
       });
     },
     signUp: ({ email, password, options }: any) => {

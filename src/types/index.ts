@@ -41,6 +41,7 @@ export interface DailyIncome {
   created_by: string;
   created_at: string;
   store?: Store;
+  is_opening?: boolean;
 }
 
 export interface DailyExpense {
