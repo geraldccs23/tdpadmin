@@ -1,0 +1,120 @@
+{
+  "info": {
+    "_postman_id": "d3922c27-5ce0-42a2-80dd-51ad335e5139",
+    "name": "rg7",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "2783528"
+  },
+  "item": [
+    {
+      "name": "mercatech",
+      "item": [
+        {
+          "name": "updateProducto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "rquest",
+                  "value": "updateProducto",
+                  "type": "text"
+                },
+                {
+                  "key": "productos",
+                  "value": "&lt;productos&gt;\n&lt;appid&gt;rg71149p2k12&lt;/appid&gt;\n&lt;producto&gt;\n    &lt;desProducto&gt;PELAGIC PREMIUM SSTEE ICON - OPEN SEAS SMOKEY BLUE L&lt;/desProducto&gt;\n    &lt;codProducto&gt;190015207423&lt;/codProducto&gt;\n    &lt;costo&gt;0&lt;/costo&gt;\n    &lt;ultCosto&gt;0&lt;/ultCosto&gt;\n    &lt;precio&gt;40.00&lt;/precio&gt;\n    &lt;precio2&gt;0&lt;/precio2&gt;\n    &lt;precio3&gt;0&lt;/precio3&gt;\n    &lt;precio4&gt;0&lt;/precio4&gt;\n    &lt;precio5&gt;0&lt;/precio5&gt;\n    &lt;cantidad&gt;1&lt;/cantidad&gt;\n    &lt;estatus&gt;1&lt;/estatus&gt;\n    &lt;id&gt;9&lt;/id&gt;\n    &lt;type&gt;V&lt;/type&gt;\n    &lt;precioUSD&gt;40.00&lt;/precioUSD&gt;\n    &lt;precio2USD&gt;0&lt;/precio2USD&gt;\n    &lt;precio3USD&gt;0&lt;/precio3USD&gt;\n    &lt;precio4USD&gt;0&lt;/precio4USD&gt;\n    &lt;precio5USD&gt;0&lt;/precio5USD&gt;\n    &lt;almacenes&gt;\n      &lt;almacen&gt;\n        &lt;code&gt;002&lt;/code&gt;\n        &lt;location&gt;FURIA&lt;/location&gt;\n        &lt;qty&gt;1&lt;/qty&gt;\n      &lt;/almacen&gt;\n    &lt;/almacenes&gt;\n  &lt;/producto&gt;\n&lt;/productos&gt;",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://mercatech-sync.com/php/controller/rest/Update.php",
+              "protocol": "https",
+              "host": ["mercatech-sync", "com"],
+              "path": ["php", "controller", "rest", "Update.php"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "updateProducto-almacen",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "rquest",
+                  "value": "updateProducto",
+                  "type": "text"
+                },
+                {
+                  "key": "productos",
+                  "value": "&lt;productos&gt;\n&lt;appid&gt;rg71149p2k12&lt;/appid&gt;\n&lt;producto&gt;\n    &lt;desProducto&gt;PELAGIC PREMIUM SSTEE ICON - OPEN SEAS SMOKEY BLUE L&lt;/desProducto&gt;\n    &lt;codProducto&gt;12345&lt;/codProducto&gt;\n    &lt;costo&gt;0&lt;/costo&gt;\n    &lt;ultCosto&gt;0&lt;/ultCosto&gt;\n    &lt;precio&gt;40.00&lt;/precio&gt;\n    &lt;precio2&gt;0&lt;/precio2&gt;\n    &lt;precio3&gt;0&lt;/precio3&gt;\n    &lt;precio4&gt;0&lt;/precio4&gt;\n    &lt;precio5&gt;0&lt;/precio5&gt;\n    &lt;cantidad&gt;1&lt;/cantidad&gt;\n    &lt;estatus&gt;1&lt;/estatus&gt;\n    &lt;id&gt;9&lt;/id&gt;\n    &lt;type&gt;V&lt;/type&gt;\n    &lt;precioUSD&gt;40.00&lt;/precioUSD&gt;\n    &lt;precio2USD&gt;0&lt;/precio2USD&gt;\n    &lt;precio3USD&gt;0&lt;/precio3USD&gt;\n    &lt;precio4USD&gt;0&lt;/precio4USD&gt;\n    &lt;precio5USD&gt;0&lt;/precio5USD&gt;\n    &lt;almacenes&gt;\n      &lt;almacen&gt;\n        &lt;code&gt;8&lt;/code&gt;\n        &lt;location&gt;odoo&lt;/location&gt;\n        &lt;qty&gt;1&lt;/qty&gt;\n      &lt;/almacen&gt;\n    &lt;/almacenes&gt;\n  &lt;/producto&gt;\n&lt;/productos&gt;",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://mercatech-sync.com/php/controller/rest/Update.php",
+              "protocol": "https",
+              "host": ["mercatech-sync", "com"],
+              "path": ["php", "controller", "rest", "Update.php"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "updateProducto-noalmacen",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "rquest",
+                  "value": "updateProducto",
+                  "type": "text"
+                },
+                {
+                  "key": "productos",
+                  "value": "&lt;productos&gt;\n&lt;appid&gt;rg71149p2k12&lt;/appid&gt;\n&lt;producto&gt;\n    &lt;desProducto&gt;PELAGIC PREMIUM SSTEE ICON - OPEN SEAS SMOKEY BLUE L&lt;/desProducto&gt;\n    &lt;codProducto&gt;12345&lt;/codProducto&gt;\n    &lt;costo&gt;0&lt;/costo&gt;\n    &lt;ultCosto&gt;0&lt;/ultCosto&gt;\n    &lt;precio&gt;1000.00&lt;/precio&gt;\n    &lt;precio2&gt;0&lt;/precio2&gt;\n    &lt;precio3&gt;0&lt;/precio3&gt;\n    &lt;precio4&gt;0&lt;/precio4&gt;\n    &lt;precio5&gt;0&lt;/precio5&gt;\n    &lt;cantidad&gt;1&lt;/cantidad&gt;\n    &lt;estatus&gt;1&lt;/estatus&gt;\n    &lt;id&gt;9&lt;/id&gt;\n    &lt;type&gt;V&lt;/type&gt;\n    &lt;precioUSD&gt;40.00&lt;/precioUSD&gt;\n    &lt;precio2USD&gt;0&lt;/precio2USD&gt;\n    &lt;precio3USD&gt;0&lt;/precio3USD&gt;\n    &lt;precio4USD&gt;0&lt;/precio4USD&gt;\n    &lt;precio5USD&gt;0&lt;/precio5USD&gt;\n  &lt;/producto&gt;\n&lt;/productos&gt;",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://mercatech-sync.com/php/controller/rest/Update.php",
+              "protocol": "https",
+              "host": ["mercatech-sync", "com"],
+              "path": ["php", "controller", "rest", "Update.php"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "rg7-crm-evolution",
+  "version": "1.0.0",
+  "description": "CRM WhatsApp bridge — Evolution API ↔ Supabase",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5"
+  }
+}

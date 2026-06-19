@@ -1,0 +1,25 @@
+# env
+.env
+
+# node
+node_modules/
+dist/
+
+# bundles
+*.tar.gz
+
+# logs
+*.log
+
+# temp / test
+test-*.js
+test-*.cjs
+test-*.mjs
+
+# debug / scripts
+diagnostic*.js
+check_*.js
+list_*.js
+analyze_*.js
+
+

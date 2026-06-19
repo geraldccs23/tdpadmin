@@ -1,0 +1,42 @@
+version: "3.7"
+
+services:
+  app:
+    image: nginx:alpine
+    volumes:
+      - /var/www/rg7-admin/dist:/usr/share/nginx/html:ro
+      - /root/rg7-admin-nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - rg7net
+    deploy:
+      replicas: 1
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.rg7-admin.rule=Host(`admin.rg7.com.ve`)"
+        - "traefik.http.routers.rg7-admin.entrypoints=web,websecure"
+        - "traefik.http.routers.rg7-admin.tls.certresolver=letsencryptresolver"
+        - "traefik.http.services.rg7-admin.loadbalancer.server.port=80"
+
+  api:
+    image: node:20
+    working_dir: /app
+    volumes:
+      - /var/www/rg7-admin/backend:/app
+    command: ["sh", "-lc", "npm install --omit=dev && node server.cjs"]
+    environment:
+      - NODE_ENV=production
+      - PORT=3003
+    networks:
+      - rg7net
+    deploy:
+      replicas: 1
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.rg7-admin-api.rule=Host(`admin.rg7.com.ve`) && PathPrefix(`/api/agent`)"
+        - "traefik.http.routers.rg7-admin-api.entrypoints=web,websecure"
+        - "traefik.http.routers.rg7-admin-api.tls.certresolver=letsencryptresolver"
+        - "traefik.http.services.rg7-admin-api.loadbalancer.server.port=3003"
+
+networks:
+  rg7net:
+    external: true
