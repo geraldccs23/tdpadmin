@@ -33,12 +33,10 @@ export function Login() {
                 <div className="bg-[#141414] border border-white/5 rounded-3xl shadow-2xl overflow-hidden backdrop-blur-xl">
                     <div className="p-8 pb-0 text-center">
                         <div className="flex justify-center mb-6">
-                            <div className="bg-[#D40000] p-4 rounded-2xl shadow-lg shadow-[#D40000]/20">
-                                <span className="text-3xl font-black text-white tracking-tighter">RG7</span>
-                            </div>
+                            <img src="/ISOTIPOTDP.png" alt="Restaurantes TDP" className="h-16 w-auto" />
                         </div>
-                        <h1 className="text-2xl font-black text-white uppercase tracking-tight mb-2">Acceso Administrativo</h1>
-                        <p className="text-gray-500 text-xs font-mono uppercase tracking-widest">ERP Integration Core v2.4</p>
+                        <h1 className="text-2xl font-black text-white uppercase tracking-tight mb-2">Restaurantes TDP</h1>
+                        <p className="text-gray-500 text-xs font-mono uppercase tracking-widest">Sistema de Gestión</p>
                     </div>
 
                     <form onSubmit={handleLogin} className="p-8 space-y-6">
@@ -103,8 +101,8 @@ export function Login() {
 
                     <div className="p-6 bg-black/40 border-t border-white/5 text-center">
                         <p className="text-[9px] text-gray-600 font-mono">
-                            RG7 ERP | PROTECTED BY SUPABASE AUTH ENGINE<br />
-                            © 2026 RG7 AUTOPARTES C.A. - TODOS LOS DERECHOS RESERVADOS
+                            Restaurantes TDP<br />
+                            © 2026 TALLER DE PÍXELES C.A. - TODOS LOS DERECHOS RESERVADOS
                         </p>
                     </div>
                 </div>

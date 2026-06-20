@@ -606,14 +606,17 @@ export default function App() {
         flex flex-col shadow-2xl overflow-hidden
       `}
       >
-        <div className="p-6 flex items-center justify-between border-b border-gray-800 min-w-[256px]">
-          <div className="flex flex-col">
-            <span className="text-2xl font-bold tracking-tighter">
-              Restaurant<span className="text-[#D40000]">DP</span>
-            </span>
-            <span className="text-[9px] text-gray-500 uppercase tracking-widest font-black">
-              Restaurant ERP
-            </span>
+        <div className="p-4 md:p-6 flex items-center justify-between border-b border-gray-800 min-w-[256px]">
+          <div className="flex items-center gap-3">
+            <img src="/ISOTIPOTDP.png" alt="Restaurantes TDP" className="h-10 w-auto" />
+            <div className="flex flex-col">
+              <span className="text-lg font-bold tracking-tighter leading-tight">
+                Restaurantes<span className="text-[#D40000]">TDP</span>
+              </span>
+              <span className="text-[8px] text-gray-500 uppercase tracking-widest font-black leading-tight">
+                Sistema de Gestión
+              </span>
+            </div>
           </div>
           <button
             onClick={handleToggleSidebar}
@@ -629,7 +632,7 @@ export default function App() {
             {(isSidebarOpen || window.innerWidth < 768) && (
               <div className="px-4 py-2 bg-green-500/10 border-l-2 border-green-500 mb-2">
                 <span className="text-[11px] text-green-400 uppercase font-black tracking-widest">
-                  RESTAURANTE
+                  RESTAURANTES
                 </span>
               </div>
             )}
@@ -716,6 +719,40 @@ export default function App() {
             userRole={userRole}
           />
 
+          {userRole === "admin" && (
+            <>
+            <div className="pb-2 mb-2">
+              <div className="px-4 py-2 bg-purple-500/10 border-l-2 border-purple-500 mb-2">
+                <span className="text-[11px] text-purple-400 uppercase font-black tracking-widest">
+                  CONFIGURACIÓN
+                </span>
+              </div>
+            </div>
+            <NavItem
+              icon={SettingsIcon}
+              label="Usuarios / Roles"
+              view="settings"
+              activeView={activeView}
+              isOpen={isSidebarOpen || window.innerWidth < 768}
+              onClick={handleSetView}
+              allowedRoles={["admin"]}
+              userRole={userRole}
+            />
+            <NavItem
+              icon={Key}
+              label="Integraciones / API"
+              view="integrations"
+              activeView={activeView}
+              isOpen={isSidebarOpen || window.innerWidth < 768}
+              onClick={handleSetView}
+              allowedRoles={["admin"]}
+              userRole={userRole}
+            />
+            </>
+          )}
+
+          {userRole !== "admin" && userRole !== "cocina" && (
+          <>
           {/* ======================= PROFIT PLUS ======================= */}
           <div className="pb-2 mb-2">
             {(isSidebarOpen || window.innerWidth < 768) && (
@@ -762,7 +799,7 @@ export default function App() {
             {(isSidebarOpen || window.innerWidth < 768) && (
               <div className="px-4 py-2 bg-[#D40000]/10 border-l-2 border-[#D40000] mb-2">
                 <span className="text-[11px] text-[#D40000] uppercase font-black tracking-widest">
-                  ERP RG7 (Operativo)
+                  ERP (Legado)
                 </span>
               </div>
             )}
@@ -1263,6 +1300,8 @@ export default function App() {
             allowedRoles={["director", "administrador"]}
             userRole={userRole}
           />
+          </>
+          )}
         </nav>
 
         <div className="p-4 border-t border-gray-800 bg-[#121212] min-w-[256px]">
@@ -1410,7 +1449,7 @@ export default function App() {
               </h1>
               <div className="h-4 w-px bg-gray-200 hidden sm:block"></div>
               <span className="text-[10px] md:text-xs text-gray-400 font-medium hidden sm:block">
-                RestaurantDP
+                Restaurantes TDP
               </span>
             </div>
           </div>
