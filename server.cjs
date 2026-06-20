@@ -191,6 +191,76 @@ app.delete("/api/users/:id", requireAdmin, async (req, res) => {
 });
 
 // --------------------
+// Roles CRUD
+// --------------------
+
+// GET /api/roles
+app.get("/api/roles", requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT id, name, label, description, is_active, created_at, updated_at FROM public.roles ORDER BY label ASC"
+    );
+    res.json({ ok: true, roles: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/roles
+app.post("/api/roles", requireAdmin, async (req, res) => {
+  try {
+    const { name, label, description } = req.body || {};
+    if (!name || !label) return res.status(400).json({ ok: false, error: "name and label required" });
+    const { rows } = await pool.query(
+      "INSERT INTO public.roles (name, label, description) VALUES ($1, $2, $3) RETURNING id, name, label, description, is_active, created_at, updated_at",
+      [name.trim().toLowerCase(), label.trim(), description || null]
+    );
+    res.json({ ok: true, role: rows[0] });
+  } catch (e) {
+    const msg = e?.constraint === "roles_name_key" ? "role name already exists" : String(e?.message || e);
+    res.status(400).json({ ok: false, error: msg });
+  }
+});
+
+// PATCH /api/roles/:id
+app.patch("/api/roles/:id", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { label, description, is_active } = req.body || {};
+    const sets = [];
+    const params = [];
+    let idx = 0;
+    if (label !== undefined) { idx++; sets.push(`label = $${idx}`); params.push(label); }
+    if (description !== undefined) { idx++; sets.push(`description = $${idx}`); params.push(description); }
+    if (is_active !== undefined) { idx++; sets.push(`is_active = $${idx}`); params.push(is_active); }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields to update" });
+    idx++; params.push(id);
+    const { rows } = await pool.query(
+      `UPDATE public.roles SET ${sets.join(", ")} WHERE id = $${idx} RETURNING id, name, label, description, is_active, created_at, updated_at`,
+      params
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "role not found" });
+    res.json({ ok: true, role: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// DELETE /api/roles/:id — soft delete
+app.delete("/api/roles/:id", requireAdmin, async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      "UPDATE public.roles SET is_active = false WHERE id = $1 AND is_active = true",
+      [req.params.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ ok: false, error: "role not found or already inactive" });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// --------------------
 // Auth middleware for agent
 // --------------------
 function requireAuth(req, res, next) {

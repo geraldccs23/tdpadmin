@@ -52,4 +52,25 @@ ALTER TABLE IF EXISTS public.support_messages DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.support_tickets DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.cashier_closings DISABLE ROW LEVEL SECURITY;
 
+-- 6. Tabla de roles dinámicos
+CREATE TABLE IF NOT EXISTS public.roles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  label TEXT NOT NULL,
+  description TEXT,
+  permissions JSONB DEFAULT '{}',
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO public.roles (name, label, description) VALUES
+  ('admin', 'Administrador', 'Acceso total al sistema'),
+  ('manager', 'Gerente', 'Gestión operativa del restaurante'),
+  ('cashier', 'Cajero', 'Punto de venta y cobros'),
+  ('kitchen', 'Cocina', 'Panel de cocina y órdenes'),
+  ('waiter', 'Mesero', 'Toma de pedidos y servicio'),
+  ('soporte', 'Soporte', 'Soporte técnico y configuración')
+ON CONFLICT (name) DO NOTHING;
+
 NOTIFY pgrst, 'reload schema';

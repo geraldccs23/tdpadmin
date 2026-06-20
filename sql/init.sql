@@ -37,6 +37,27 @@ CREATE TABLE IF NOT EXISTS public.api_tokens (
   CONSTRAINT api_tokens_pkey PRIMARY KEY (id)
 );
 
--- 4. Esquema de restaurante
+-- 4. Roles dinámicos
+CREATE TABLE IF NOT EXISTS public.roles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  label TEXT NOT NULL,
+  description TEXT,
+  permissions JSONB DEFAULT '{}',
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO public.roles (name, label, description) VALUES
+  ('admin', 'Administrador', 'Acceso total al sistema'),
+  ('manager', 'Gerente', 'Gestión operativa del restaurante'),
+  ('cashier', 'Cajero', 'Punto de venta y cobros'),
+  ('kitchen', 'Cocina', 'Panel de cocina y órdenes'),
+  ('waiter', 'Mesero', 'Toma de pedidos y servicio'),
+  ('soporte', 'Soporte', 'Soporte técnico y configuración')
+ON CONFLICT (name) DO NOTHING;
+
+-- 5. Esquema de restaurante
 -- (ejecutar desde la raíz del proyecto: psql -h postgres -U tdp_admin -d tdp_main -f sql/init.sql)
 \i sql/migration-010-restaurant-schema.sql
