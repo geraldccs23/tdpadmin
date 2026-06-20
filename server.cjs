@@ -1120,6 +1120,86 @@ app.post("/api/support/upload", requireSupportAuth, async (req, res) => {
 app.use("/uploads", express.static(UPLOAD_DIR));
 
 // =============================================================================
+// Settings / Fiscal CRUD
+// =============================================================================
+const SETTINGS_TABLES = {
+  company: 'company_settings',
+  branches: 'company_branches',
+  warehouses: 'company_warehouses',
+  'tax-rates': 'tax_rates',
+  'document-sequences': 'document_sequences',
+  'fiscal-providers': 'fiscal_printers_or_providers',
+  'municipal-tax': 'municipal_tax_settings',
+  'legal-permits': 'legal_permits',
+};
+
+// GET /api/settings/:entity — list (or first row for company/singleton tables)
+app.get("/api/settings/:entity", requireJwt, async (req, res) => {
+  const table = SETTINGS_TABLES[req.params.entity];
+  if (!table) return res.status(404).json({ ok: false, error: "unknown entity" });
+  try {
+    const { rows } = await pool.query(`SELECT * FROM public.${sanitizeIdent(table)} ORDER BY created_at DESC`);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/settings/:entity — create
+app.post("/api/settings/:entity", requireJwt, async (req, res) => {
+  const table = SETTINGS_TABLES[req.params.entity];
+  if (!table) return res.status(404).json({ ok: false, error: "unknown entity" });
+  try {
+    const body = req.body;
+    const cols = Object.keys(body);
+    const safeCols = cols.map(c => sanitizeIdent(c)).filter(Boolean);
+    const params = safeCols.map(c => body[cols.find(k => sanitizeIdent(k) === c) || c]);
+    const placeholders = safeCols.map((_, i) => `$${i + 1}`);
+    const { rows } = await pool.query(
+      `INSERT INTO public.${sanitizeIdent(table)} (${safeCols.join(',')}) VALUES (${placeholders.join(',')}) RETURNING *`,
+      params
+    );
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/settings/:entity/:id — update
+app.patch("/api/settings/:entity/:id", requireJwt, async (req, res) => {
+  const table = SETTINGS_TABLES[req.params.entity];
+  if (!table) return res.status(404).json({ ok: false, error: "unknown entity" });
+  try {
+    const body = req.body;
+    const cols = Object.keys(body);
+    const params = [];
+    const sets = cols.map((c, i) => { params.push(body[c]); return `${sanitizeIdent(c)} = $${i + 1}`; });
+    params.push(req.params.id);
+    const { rows } = await pool.query(
+      `UPDATE public.${sanitizeIdent(table)} SET ${sets.join(',')} WHERE id = $${params.length} RETURNING *`,
+      params
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// DELETE /api/settings/:entity/:id
+app.delete("/api/settings/:entity/:id", requireJwt, async (req, res) => {
+  const table = SETTINGS_TABLES[req.params.entity];
+  if (!table) return res.status(404).json({ ok: false, error: "unknown entity" });
+  try {
+    const { rowCount } = await pool.query(`DELETE FROM public.${sanitizeIdent(table)} WHERE id = $1`, [req.params.id]);
+    if (rowCount === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// =============================================================================
 // Generic Data Proxy (replaces Supabase .from() calls)
 // =============================================================================
 
