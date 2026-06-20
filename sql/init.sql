@@ -58,6 +58,10 @@ INSERT INTO public.roles (name, label, description, permissions) VALUES
   ('soporte', 'Soporte', 'Soporte técnico y configuración', '{"dashboard":{"view":true},"pos":{"view":false,"create":false,"refund":false},"orders":{"view":false,"create":false,"update":false,"cancel":false},"kitchen":{"view":false,"update":false},"menu":{"view":false,"create":false,"update":false,"delete":false},"inventory":{"view":false,"create":false,"update":false,"adjust":false},"recipes":{"view":false,"create":false,"update":false,"delete":false},"purchases":{"view":false,"create":false,"update":false},"reports":{"view":false},"users":{"view":true,"create":false,"update":false,"delete":false},"roles":{"view":false,"create":false,"update":false,"delete":false},"settings":{"view":true,"update":false},"support":{"view":true,"update":true}}'::jsonb)
 ON CONFLICT (name) DO UPDATE SET permissions = EXCLUDED.permissions;
 
+INSERT INTO public.users (email, name, role, password_hash)
+VALUES ('demo@restaurantdp.local', 'Demo', 'waiter', '$2b$10$cT6VEbY1kUCtjDCMbiT7hOjjmlHnfdsct4MKgpB/HsEKODGtmgWo2')
+ON CONFLICT (email) DO NOTHING;
+
 -- 5. Esquema de restaurante
 -- (ejecutar desde la raíz del proyecto: psql -h postgres -U tdp_admin -d tdp_main -f sql/init.sql)
 \i sql/migration-010-restaurant-schema.sql

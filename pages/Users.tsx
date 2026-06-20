@@ -25,8 +25,18 @@ function UsersTab({ roles }: { roles: any[] }) {
 
   const fetchUsers = async () => {
     setLoading(true);
-    const json = await api('/api/users');
-    if (json.ok) setUsers(json.users);
+    setError('');
+    try {
+      const json = await api('/api/users');
+      if (json && json.ok) {
+        setUsers(json.users || []);
+      } else {
+        setError(json?.error || 'Error al cargar usuarios');
+        console.error('fetchUsers failed:', json);
+      }
+    } catch (e: any) {
+      setError(e.message || 'Error de red');
+    }
     setLoading(false);
   };
 
