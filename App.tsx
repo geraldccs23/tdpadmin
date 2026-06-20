@@ -84,6 +84,7 @@ import { Orders } from "./pages/Orders";
 import { KitchenPanel } from "./pages/KitchenPanel";
 import { Ingredients } from "./pages/Ingredients";
 import { Recipes } from "./pages/Recipes";
+import { Users as UsersPage } from "./pages/Users";
 
 type View =
   | "dashboard"
@@ -131,7 +132,8 @@ type View =
   | "orders"
   | "kitchen_panel"
   | "ingredients"
-  | "recipes";
+  | "recipes"
+  | "users";
 export type Role =
   | "director"
   | "supervisor"
@@ -342,6 +344,7 @@ const rolePermissions: Record<Role, View[]> = {
     "purchases",
     "sync",
     "settings",
+    "users",
     "fordmac",
     "income",
     "expenses",
@@ -729,8 +732,18 @@ export default function App() {
               </div>
             </div>
             <NavItem
+              icon={Users}
+              label="Usuarios"
+              view="users"
+              activeView={activeView}
+              isOpen={isSidebarOpen || window.innerWidth < 768}
+              onClick={handleSetView}
+              allowedRoles={["admin"]}
+              userRole={userRole}
+            />
+            <NavItem
               icon={SettingsIcon}
-              label="Usuarios / Roles"
+              label="Configuración"
               view="settings"
               activeView={activeView}
               isOpen={isSidebarOpen || window.innerWidth < 768}
@@ -1445,6 +1458,8 @@ export default function App() {
                                                                        ? "Ingredientes"
                                                                        : activeView === "recipes"
                                                                        ? "Recetas"
+                                                                       : activeView === "users"
+                                                                       ? "Usuarios"
                                                                        : activeView}
               </h1>
               <div className="h-4 w-px bg-gray-200 hidden sm:block"></div>
@@ -1544,6 +1559,7 @@ export default function App() {
               {activeView === "kitchen_panel" && <KitchenPanel />}
               {activeView === "ingredients" && <Ingredients />}
               {activeView === "recipes" && <Recipes />}
+              {activeView === "users" && <UsersPage />}
             </>
           )}
         </div>

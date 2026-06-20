@@ -100,6 +100,97 @@ app.post("/api/auth/logout", requireJwt, async (_req, res) => {
 });
 
 // --------------------
+// Admin-only middleware (JWT + role=admin)
+// --------------------
+function requireAdmin(req, res, next) {
+  requireJwt(req, res, () => {
+    if (req.user?.role !== "admin") {
+      return res.status(403).json({ ok: false, error: "forbidden" });
+    }
+    next();
+  });
+}
+
+// --------------------
+// Users CRUD
+// --------------------
+
+// GET /api/users — list all users (no password_hash)
+app.get("/api/users", requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT id, email, name, role, is_active, created_at, updated_at FROM public.users ORDER BY email ASC"
+    );
+    res.json({ ok: true, users: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/users — create user
+app.post("/api/users", requireAdmin, async (req, res) => {
+  try {
+    const { email, name, role, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ ok: false, error: "email and password required" });
+    }
+    const validRoles = ["admin", "manager", "cashier", "kitchen", "waiter"];
+    const userRole = validRoles.includes(role) ? role : "waiter";
+    const hash = bcrypt.hashSync(password, 10);
+    const { rows } = await pool.query(
+      "INSERT INTO public.users (email, name, role, password_hash) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role, is_active, created_at, updated_at",
+      [email.trim().toLowerCase(), name || email.trim().toLowerCase(), userRole, hash]
+    );
+    res.json({ ok: true, user: rows[0] });
+  } catch (e) {
+    const msg = e?.constraint === "users_email_key" ? "email already exists" : String(e?.message || e);
+    res.status(400).json({ ok: false, error: msg });
+  }
+});
+
+// PATCH /api/users/:id — update user (role, active, name)
+app.patch("/api/users/:id", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, role, is_active, password } = req.body || {};
+    const sets = [];
+    const params = [];
+    let idx = 0;
+
+    if (name !== undefined) { idx++; sets.push(`name = $${idx}`); params.push(name); }
+    if (role !== undefined) { idx++; sets.push(`role = $${idx}`); params.push(role); }
+    if (is_active !== undefined) { idx++; sets.push(`is_active = $${idx}`); params.push(is_active); }
+    if (password !== undefined) { idx++; sets.push(`password_hash = $${idx}`); params.push(bcrypt.hashSync(password, 10)); }
+
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields to update" });
+
+    idx++; params.push(id);
+    const { rows } = await pool.query(
+      `UPDATE public.users SET ${sets.join(", ")} WHERE id = $${idx} RETURNING id, email, name, role, is_active, created_at, updated_at`,
+      params
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "user not found" });
+    res.json({ ok: true, user: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// DELETE /api/users/:id — deactivate user (soft delete)
+app.delete("/api/users/:id", requireAdmin, async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      "UPDATE public.users SET is_active = false WHERE id = $1 AND is_active = true",
+      [req.params.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ ok: false, error: "user not found or already inactive" });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// --------------------
 // Auth middleware for agent
 // --------------------
 function requireAuth(req, res, next) {

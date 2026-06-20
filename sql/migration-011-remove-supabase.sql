@@ -22,6 +22,11 @@ VALUES ('admin@restaurantdp.local', 'Admin', 'admin',
 )
 ON CONFLICT (email) DO NOTHING;
 
+-- 2b. Agregar roles de restaurante al CHECK constraint
+ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE public.users ADD CONSTRAINT users_role_check
+  CHECK (role IN ('director','supervisor','supervisor_ventas','supervisor_compras','administrador','cajero','vendedor','compras','soporte','delivery','supervisor_almacen','almacenista','admin','cocina','manager','cashier','kitchen','waiter'));
+
 -- 3. Recrear api_tokens sin FK a auth.users
 DROP TABLE IF EXISTS public.api_tokens CASCADE;
 CREATE TABLE public.api_tokens (

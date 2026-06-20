@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT NOT NULL UNIQUE,
   name TEXT,
-  role TEXT NOT NULL DEFAULT 'cajero' CHECK (role IN ('director','supervisor','supervisor_ventas','supervisor_compras','administrador','cajero','vendedor','compras','soporte','delivery','supervisor_almacen','almacenista','admin','cocina')),
+  role TEXT NOT NULL DEFAULT 'cajero' CHECK (role IN ('director','supervisor','supervisor_ventas','supervisor_compras','administrador','cajero','vendedor','compras','soporte','delivery','supervisor_almacen','almacenista','admin','cocina','manager','cashier','kitchen','waiter')),
   branch TEXT,
   is_active BOOLEAN NOT NULL DEFAULT true,
   password_hash TEXT,
