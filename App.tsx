@@ -437,7 +437,7 @@ const NavItem = (props: NavItemProps) => {
 export default function App() {
   const [session, setSession] = useState<any>(null);
   const [userRole, setUserRole] = useState<Role | null>(null);
-  const [activeView, setActiveView] = useState<View>("dashboard");
+  const [activeView, setActiveView] = useState<View>("dashboard_restaurant");
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
   const [isRateModalOpen, setIsRateModalOpen] = useState(false);
   const [rateInput, setRateInput] = useState<string>("");
