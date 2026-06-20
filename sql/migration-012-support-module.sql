@@ -52,13 +52,29 @@ CREATE TABLE public.support_messages (
 CREATE INDEX IF NOT EXISTS idx_support_messages_ticket ON public.support_messages(ticket_id);
 
 -- =============================================================================
--- Vista con emails resueltos
+-- Vista con emails resueltos (sin columnas duplicadas)
 -- =============================================================================
-CREATE OR REPLACE VIEW public.v_support_tickets AS
+DROP VIEW IF EXISTS public.v_support_tickets;
+CREATE VIEW public.v_support_tickets AS
 SELECT
-  t.*,
-  COALESCE(t.user_email, u_creator.email) AS creator_email,
-  COALESCE(t.assigned_email, u_assigned.email) AS assigned_email
+  t.id,
+  t.tenant_id,
+  t.title,
+  t.description,
+  t.status,
+  t.priority,
+  t.category,
+  t.user_id,
+  t.user_email,
+  t.assigned_to,
+  COALESCE(t.assigned_email, u_assigned.email) AS assigned_email,
+  t.branch,
+  t.image_url,
+  t.external_ticket_id,
+  t.sync_status,
+  t.created_at,
+  t.updated_at,
+  COALESCE(t.user_email, u_creator.email) AS creator_email
 FROM public.support_tickets t
 LEFT JOIN public.users u_creator ON t.user_id = u_creator.id
 LEFT JOIN public.users u_assigned ON t.assigned_to = u_assigned.id;
