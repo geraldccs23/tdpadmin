@@ -1124,6 +1124,7 @@ app.use("/uploads", express.static(UPLOAD_DIR));
 // =============================================================================
 const SETTINGS_TABLES = {
   company: 'company_settings',
+  'fiscal-entities': 'fiscal_entities',
   branches: 'company_branches',
   warehouses: 'company_warehouses',
   'tax-rates': 'tax_rates',
@@ -1150,7 +1151,11 @@ app.post("/api/settings/:entity", requireJwt, async (req, res) => {
   const table = SETTINGS_TABLES[req.params.entity];
   if (!table) return res.status(404).json({ ok: false, error: "unknown entity" });
   try {
-    const body = req.body;
+    const body = { ...req.body };
+    // Handle is_default for fiscal_entities
+    if (table === 'fiscal_entities' && body.is_default) {
+      await pool.query('UPDATE public.fiscal_entities SET is_default = false WHERE is_default = true');
+    }
     const cols = Object.keys(body);
     const safeCols = cols.map(c => sanitizeIdent(c)).filter(Boolean);
     const params = safeCols.map(c => body[cols.find(k => sanitizeIdent(k) === c) || c]);
@@ -1170,7 +1175,11 @@ app.patch("/api/settings/:entity/:id", requireJwt, async (req, res) => {
   const table = SETTINGS_TABLES[req.params.entity];
   if (!table) return res.status(404).json({ ok: false, error: "unknown entity" });
   try {
-    const body = req.body;
+    const body = { ...req.body };
+    // Handle is_default for fiscal_entities
+    if (table === 'fiscal_entities' && body.is_default) {
+      await pool.query('UPDATE public.fiscal_entities SET is_default = false WHERE is_default = true');
+    }
     const cols = Object.keys(body);
     const params = [];
     const sets = cols.map((c, i) => { params.push(body[c]); return `${sanitizeIdent(c)} = $${i + 1}`; });
