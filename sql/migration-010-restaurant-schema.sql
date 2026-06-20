@@ -165,26 +165,32 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_restaurant_categories_updated_at ON public.restaurant_categories;
 CREATE TRIGGER trg_restaurant_categories_updated_at
   BEFORE UPDATE ON public.restaurant_categories
   FOR EACH ROW EXECUTE FUNCTION public.set_restaurant_updated_at();
 
+DROP TRIGGER IF EXISTS trg_restaurant_menu_items_updated_at ON public.restaurant_menu_items;
 CREATE TRIGGER trg_restaurant_menu_items_updated_at
   BEFORE UPDATE ON public.restaurant_menu_items
   FOR EACH ROW EXECUTE FUNCTION public.set_restaurant_updated_at();
 
+DROP TRIGGER IF EXISTS trg_restaurant_ingredients_updated_at ON public.restaurant_ingredients;
 CREATE TRIGGER trg_restaurant_ingredients_updated_at
   BEFORE UPDATE ON public.restaurant_ingredients
   FOR EACH ROW EXECUTE FUNCTION public.set_restaurant_updated_at();
 
+DROP TRIGGER IF EXISTS trg_restaurant_recipes_updated_at ON public.restaurant_recipes;
 CREATE TRIGGER trg_restaurant_recipes_updated_at
   BEFORE UPDATE ON public.restaurant_recipes
   FOR EACH ROW EXECUTE FUNCTION public.set_restaurant_updated_at();
 
+DROP TRIGGER IF EXISTS trg_restaurant_orders_updated_at ON public.restaurant_orders;
 CREATE TRIGGER trg_restaurant_orders_updated_at
   BEFORE UPDATE ON public.restaurant_orders
   FOR EACH ROW EXECUTE FUNCTION public.set_restaurant_updated_at();
 
+DROP TRIGGER IF EXISTS trg_restaurant_order_items_updated_at ON public.restaurant_order_items;
 CREATE TRIGGER trg_restaurant_order_items_updated_at
   BEFORE UPDATE ON public.restaurant_order_items
   FOR EACH ROW EXECUTE FUNCTION public.set_restaurant_updated_at();
