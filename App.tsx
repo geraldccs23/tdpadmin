@@ -422,8 +422,8 @@ const NavItem = (props: NavItemProps) => {
       onClick={() => props.onClick(props.view)}
       className={`flex items-center space-x-3 w-full px-4 py-3 rounded-lg transition-all ${
         isActive
-          ? "bg-[#D40000] text-white shadow-md"
-          : "text-gray-400 hover:bg-gray-800 hover:text-white"
+          ? "bg-[#009FE3] text-white shadow-sm"
+          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
       }`}
     >
       <Icon size={20} />
@@ -601,26 +601,26 @@ export default function App() {
       <aside
         className={`
         fixed md:static inset-y-0 left-0 z-50
-        bg-[#1A1A1A] text-white transition-all duration-300 ease-in-out
+        bg-white text-gray-900 border-r border-gray-200 transition-all duration-300 ease-in-out
         ${isSidebarOpen ? "w-64 translate-x-0" : "w-0 -translate-x-full md:w-20 md:translate-x-0"} 
         flex flex-col shadow-2xl overflow-hidden
       `}
       >
-        <div className="p-4 md:p-6 flex items-center justify-between border-b border-gray-800 min-w-[256px]">
+        <div className="p-4 md:p-6 flex items-center justify-between border-b border-gray-200 min-w-[256px]">
           <div className="flex items-center gap-3">
             <img src="/ISOTIPOTDP.png" alt="Restaurantes TDP" className="h-10 w-auto" />
             <div className="flex flex-col">
               <span className="text-lg font-bold tracking-tighter leading-tight">
-                Restaurantes<span className="text-[#D40000]">TDP</span>
+                Restaurantes<span className="text-[#009FE3]">TDP</span>
               </span>
-              <span className="text-[8px] text-gray-500 uppercase tracking-widest font-black leading-tight">
+              <span className="text-[8px] text-gray-500 uppercase tracking-widest font-bold leading-tight">
                 Sistema de Gestión
               </span>
             </div>
           </div>
           <button
             onClick={handleToggleSidebar}
-            className="p-1 hover:bg-gray-800 rounded md:hidden"
+            className="p-1 hover:bg-gray-100 rounded md:hidden"
           >
             <X size={20} />
           </button>
@@ -630,8 +630,8 @@ export default function App() {
           {/* ======================= RESTAURANTE ======================= */}
           <div className="pb-2 mb-2">
             {(isSidebarOpen || window.innerWidth < 768) && (
-              <div className="px-4 py-2 bg-green-500/10 border-l-2 border-green-500 mb-2">
-                <span className="text-[11px] text-green-400 uppercase font-black tracking-widest">
+              <div className="px-4 py-2 bg-[#009FE3]/10 border-l-2 border-[#009FE3] mb-2">
+                <span className="text-[11px] text-[#009FE3] uppercase font-bold tracking-widest">
                   RESTAURANTES
                 </span>
               </div>
@@ -722,8 +722,8 @@ export default function App() {
           {userRole === "admin" && (
             <>
             <div className="pb-2 mb-2">
-              <div className="px-4 py-2 bg-purple-500/10 border-l-2 border-purple-500 mb-2">
-                <span className="text-[11px] text-purple-400 uppercase font-black tracking-widest">
+              <div className="px-4 py-2 bg-[#009FE3]/10 border-l-2 border-[#009FE3] mb-2">
+                <span className="text-[11px] text-[#009FE3] uppercase font-bold tracking-widest">
                   CONFIGURACIÓN
                 </span>
               </div>

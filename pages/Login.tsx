@@ -24,55 +24,52 @@ export function Login() {
     };
 
     return (
-        <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-4 font-sans relative overflow-hidden">
-            {/* Background Decorative Elements */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#D40000]/10 rounded-full blur-[120px]" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#D40000]/5 rounded-full blur-[120px]" />
-
-            <div className="w-full max-w-md z-10">
-                <div className="bg-[#141414] border border-white/5 rounded-3xl shadow-2xl overflow-hidden backdrop-blur-xl">
-                    <div className="p-8 pb-0 text-center">
+        <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-4 font-sans">
+            <div className="w-full max-w-md">
+                <div className="bg-white rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.08)] overflow-hidden">
+                    <div className="p-10 pb-0 text-center">
                         <div className="flex justify-center mb-6">
-                            <img src="/ISOTIPOTDP.png" alt="Restaurantes TDP" className="h-16 w-auto" />
+                            <img src="/ISOTIPOTDP.png" alt="Restaurantes TDP" className="h-14 w-auto" />
                         </div>
-                        <h1 className="text-2xl font-black text-white uppercase tracking-tight mb-2">Restaurantes TDP</h1>
-                        <p className="text-gray-500 text-xs font-mono uppercase tracking-widest">Sistema de Gestión</p>
+                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight mb-1">RestaurantDP</h1>
+                        <p className="text-sm text-gray-500">Plataforma de gestión para restaurantes</p>
+                        <p className="text-[11px] text-gray-400 mt-1">desarrollada por Taller de Píxeles</p>
                     </div>
 
-                    <form onSubmit={handleLogin} className="p-8 space-y-6">
+                    <form onSubmit={handleLogin} className="p-10 pt-8 space-y-5">
                         {error && (
-                            <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-xl flex items-center gap-3 text-sm animate-shake">
-                                <AlertCircle size={18} />
+                            <div className="bg-red-50 border border-red-200 text-red-600 p-3.5 rounded-xl flex items-center gap-3 text-sm">
+                                <AlertCircle size={18} className="shrink-0" />
                                 <span>{error}</span>
                             </div>
                         )}
 
                         <div className="space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Email Corporativo</label>
-                                <div className="relative group">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-[#D40000] transition-colors" size={18} />
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-gray-700 ml-1">Correo electrónico</label>
+                                <div className="relative">
+                                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                                     <input
                                         type="email"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                         required
-                                        className="w-full bg-black/40 border border-white/5 rounded-xl py-3.5 pl-12 pr-4 text-white text-sm focus:outline-none focus:border-[#D40000]/50 focus:ring-1 focus:ring-[#D40000]/50 transition-all placeholder:text-gray-700"
-                                        placeholder="usuario@rg7.com.ve"
+                                        className="w-full bg-white border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-gray-900 text-sm focus:outline-none focus:border-[#009FE3] focus:ring-2 focus:ring-[#009FE3]/20 transition-all placeholder:text-gray-400"
+                                        placeholder="admin@restaurantdp.local"
                                     />
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Contraseña</label>
-                                <div className="relative group">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-[#D40000] transition-colors" size={18} />
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-gray-700 ml-1">Contraseña</label>
+                                <div className="relative">
+                                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                                     <input
                                         type="password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         required
-                                        className="w-full bg-black/40 border border-white/5 rounded-xl py-3.5 pl-12 pr-4 text-white text-sm focus:outline-none focus:border-[#D40000]/50 focus:ring-1 focus:ring-[#D40000]/50 transition-all placeholder:text-gray-700"
+                                        className="w-full bg-white border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-gray-900 text-sm focus:outline-none focus:border-[#009FE3] focus:ring-2 focus:ring-[#009FE3]/20 transition-all placeholder:text-gray-400"
                                         placeholder="••••••••"
                                     />
                                 </div>
@@ -82,27 +79,22 @@ export function Login() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-[#D40000] hover:bg-[#B80000] disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-black py-4 rounded-xl shadow-lg shadow-[#D40000]/10 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs"
+                            className="w-full bg-[#009FE3] hover:bg-[#0088c4] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-sm"
                         >
                             {loading ? (
                                 <Loader2 className="animate-spin" size={18} />
                             ) : (
                                 <>
                                     <LogIn size={18} />
-                                    <span>Entrar al Sistema</span>
+                                    <span>Iniciar sesión</span>
                                 </>
                             )}
                         </button>
-
-                        <div className="text-center pt-2">
-                            <a href="#" className="text-[10px] text-gray-600 hover:text-gray-400 font-bold uppercase tracking-tighter">¿Olvidaste tu contraseña? Contactar Soporte</a>
-                        </div>
                     </form>
 
-                    <div className="p-6 bg-black/40 border-t border-white/5 text-center">
-                        <p className="text-[9px] text-gray-600 font-mono">
-                            Restaurantes TDP<br />
-                            © 2026 TALLER DE PÍXELES C.A. - TODOS LOS DERECHOS RESERVADOS
+                    <div className="px-10 py-4 bg-gray-50 border-t border-gray-100 text-center">
+                        <p className="text-[10px] text-gray-400">
+                            RestaurantDP © {new Date().getFullYear()} — Taller de Píxeles C.A.
                         </p>
                     </div>
                 </div>
