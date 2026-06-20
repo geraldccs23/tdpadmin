@@ -1,10 +1,8 @@
-// /root/rg7-agent/app/server.js
-// RG7 Agent API (Sales + Purchases + Stock Snapshot)
-// - Auth via Bearer AGENT_TOKEN
-// - /api/agent/ping
-// - /api/agent/sales_lines (rg7_hist.sales_lines) idempotent by uniq_key
-// - /api/agent/purchase_lines (public.purchase_lines) idempotent by uniq_key
-// - /api/agent/stock_snapshot (public.stock_snapshots + public.stock_snapshot_lines)
+// restaurantdp — Backend Server
+// - Agent API: /api/agent/* (auth: AGENT_TOKEN)
+// - Admin API: /api/agent/tokens (auth: ADMIN_API_TOKEN)
+// - Data Proxy: /api/data/* (auth: ADMIN_API_TOKEN)
+//   Replaces Supabase .from() calls for the frontend
 
 require('dotenv').config();
 const express = require("express");
@@ -23,6 +21,7 @@ app.use((_req, res, next) => {
 });
 const PORT = process.env.PORT || 3003;
 const AGENT_TOKEN = process.env.AGENT_TOKEN || "";
+const ADMIN_API_TOKEN = process.env.ADMIN_API_TOKEN || "";
 
 // --------------------
 // Auth middleware
@@ -545,75 +544,84 @@ app.post("/api/agent/cxc_lines", requireAuth, async (req, res) => {
 });
 
 // --------------------
-// API Tokens CRUD (via Supabase service_role)
+// Helpers
 // --------------------
-let _sbAdmin;
-async function getSbAdmin() {
-  if (!_sbAdmin) {
-    const { createClient } = await import('@supabase/supabase-js');
-    const { default: ws } = await import('ws');
-    _sbAdmin = createClient(
-      process.env.SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { realtime: { transport: ws } }
-    );
-  }
-  return _sbAdmin;
-}
-
 function genToken() {
-  return "rg7_" + crypto.randomBytes(32).toString("hex");
+  return "tdp_" + crypto.randomBytes(32).toString("hex");
 }
 
 function sha256(s) {
   return crypto.createHash("sha256").update(s).digest("hex");
 }
 
-async function requireSupabaseSession(req, res, next) {
+// --------------------
+// Admin token auth middleware (replaces Supabase session)
+// --------------------
+function requireAdminToken(req, res, next) {
   const h = req.headers["authorization"] || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : "";
-  if (!token) return res.status(401).json({ ok: false, error: "missing token" });
+  if (!ADMIN_API_TOKEN || token !== ADMIN_API_TOKEN) {
+    return res.status(401).json({ ok: false, error: "unauthorized" });
+  }
+  next();
+}
+
+// --------------------
+// Mercatech: validate API token via PG
+// --------------------
+async function requireMercatechToken(req, res, next) {
+  const h = req.headers["authorization"] || "";
+  const raw = h.startsWith("Bearer ") ? h.slice(7) : h;
+  if (!raw) return res.status(401).json({ ok: false, error: "missing token" });
   try {
-    const sb = await getSbAdmin();
-    const { data: { user }, error } = await sb.auth.getUser(token);
-    if (error || !user) return res.status(401).json({ ok: false, error: "invalid session" });
-    req.sessionUser = { id: user.id, email: user.email };
+    const hash = sha256(raw);
+    const { rows } = await pool.query(
+      "SELECT id, name FROM public.api_tokens WHERE token_hash = $1 AND active = true LIMIT 1",
+      [hash]
+    );
+    if (rows.length === 0) return res.status(401).json({ ok: false, error: "invalid token" });
+    const ip = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '';
+    await pool.query(
+      "UPDATE public.api_tokens SET last_used_at = NOW(), last_ip = $2 WHERE id = $1",
+      [rows[0].id, ip || '']
+    );
+    req.mercatechClient = rows[0].name;
     next();
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
 }
 
+// --------------------
+// API Tokens CRUD (via PostgreSQL direct)
+// --------------------
+
 // GET /api/agent/tokens — list all tokens
-app.get("/api/agent/tokens", requireSupabaseSession, async (req, res) => {
+app.get("/api/agent/tokens", requireAdminToken, async (req, res) => {
   try {
-    const sb = await getSbAdmin();
-    const { data, error } = await sb
-      .from('api_tokens')
-      .select('id, name, created_at, expires_at, last_used_at, last_ip, active, created_by')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    res.json({ ok: true, tokens: data || [] });
+    const { rows } = await pool.query(
+      "SELECT id, name, created_at, expires_at, last_used_at, last_ip, active, created_by FROM public.api_tokens ORDER BY created_at DESC"
+    );
+    res.json({ ok: true, tokens: rows });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
 });
 
 // POST /api/agent/tokens — create new token
-app.post("/api/agent/tokens", requireSupabaseSession, async (req, res) => {
+app.post("/api/agent/tokens", requireAdminToken, async (req, res) => {
   const { name, expires_in_days } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ ok: false, error: "name required" });
   try {
-    const sb = await getSbAdmin();
     const raw = genToken();
     const hash = sha256(raw);
     const expiresAt = parseInt(expires_in_days) > 0
       ? new Date(Date.now() + parseInt(expires_in_days) * 86400000).toISOString()
       : null;
-    const { error } = await sb
-      .from('api_tokens')
-      .insert({ name: name.trim(), token_hash: hash, expires_at: expiresAt, created_by: req.sessionUser.id });
-    if (error) throw error;
+    await pool.query(
+      "INSERT INTO public.api_tokens (name, token_hash, expires_at) VALUES ($1, $2, $3)",
+      [name.trim(), hash, expiresAt]
+    );
     res.json({ ok: true, token: raw });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
@@ -621,18 +629,17 @@ app.post("/api/agent/tokens", requireSupabaseSession, async (req, res) => {
 });
 
 // POST /api/agent/tokens/:id/regenerate
-app.post("/api/agent/tokens/:id/regenerate", requireSupabaseSession, async (req, res) => {
+app.post("/api/agent/tokens/:id/regenerate", requireAdminToken, async (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id)) return res.status(400).json({ ok: false, error: "invalid id" });
   try {
-    const sb = await getSbAdmin();
     const raw = genToken();
     const hash = sha256(raw);
-    const { error } = await sb
-      .from('api_tokens')
-      .update({ token_hash: hash, last_used_at: null, last_ip: null })
-      .eq('id', id);
-    if (error) throw error;
+    const { rowCount } = await pool.query(
+      "UPDATE public.api_tokens SET token_hash = $2, last_used_at = NULL, last_ip = NULL WHERE id = $1",
+      [id, hash]
+    );
+    if (rowCount === 0) return res.status(404).json({ ok: false, error: "token not found" });
     res.json({ ok: true, token: raw });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
@@ -640,13 +647,15 @@ app.post("/api/agent/tokens/:id/regenerate", requireSupabaseSession, async (req,
 });
 
 // POST /api/agent/tokens/:id/deactivate
-app.post("/api/agent/tokens/:id/deactivate", requireSupabaseSession, async (req, res) => {
+app.post("/api/agent/tokens/:id/deactivate", requireAdminToken, async (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id)) return res.status(400).json({ ok: false, error: "invalid id" });
   try {
-    const sb = await getSbAdmin();
-    const { error } = await sb.from('api_tokens').update({ active: false }).eq('id', id);
-    if (error) throw error;
+    const { rowCount } = await pool.query(
+      "UPDATE public.api_tokens SET active = false WHERE id = $1",
+      [id]
+    );
+    if (rowCount === 0) return res.status(404).json({ ok: false, error: "token not found" });
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
@@ -654,13 +663,15 @@ app.post("/api/agent/tokens/:id/deactivate", requireSupabaseSession, async (req,
 });
 
 // POST /api/agent/tokens/:id/reactivate
-app.post("/api/agent/tokens/:id/reactivate", requireSupabaseSession, async (req, res) => {
+app.post("/api/agent/tokens/:id/reactivate", requireAdminToken, async (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id)) return res.status(400).json({ ok: false, error: "invalid id" });
   try {
-    const sb = await getSbAdmin();
-    const { error } = await sb.from('api_tokens').update({ active: true }).eq('id', id);
-    if (error) throw error;
+    const { rowCount } = await pool.query(
+      "UPDATE public.api_tokens SET active = true WHERE id = $1",
+      [id]
+    );
+    if (rowCount === 0) return res.status(404).json({ ok: false, error: "token not found" });
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
@@ -668,33 +679,8 @@ app.post("/api/agent/tokens/:id/reactivate", requireSupabaseSession, async (req,
 });
 
 // --------------------
-// Mercatech: validate API token
+// Mercatech: receive XML product update
 // --------------------
-async function requireMercatechToken(req, res, next) {
-  const h = req.headers["authorization"] || "";
-  const raw = h.startsWith("Bearer ") ? h.slice(7) : h;
-  if (!raw) return res.status(401).json({ ok: false, error: "missing token" });
-  try {
-    const sb = await getSbAdmin();
-    const hash = sha256(raw);
-    const { data, error } = await sb
-      .from('api_tokens')
-      .select('id, name')
-      .eq('token_hash', hash)
-      .eq('active', true)
-      .maybeSingle();
-    if (error) throw error;
-    if (!data) return res.status(401).json({ ok: false, error: "invalid token" });
-    const ip = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '';
-    await sb.from('api_tokens').update({ last_used_at: new Date().toISOString(), last_ip: ip }).eq('id', data.id);
-    req.mercatechClient = data.name;
-    next();
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e?.message || e) });
-  }
-}
-
-// POST /api/agent/mercatech/update — receive XML product update from Mercatech
 app.post("/api/agent/mercatech/update", requireMercatechToken, async (req, res) => {
   let xml;
   if (req.is('xml') || req.is('text/xml')) {
@@ -716,8 +702,10 @@ app.post("/api/agent/mercatech/update", requireMercatechToken, async (req, res) 
   const cantidad = qtyMatch ? parseInt(qtyMatch[1]) || 0 : 0;
   const almacenes = [...xml.matchAll(/<almacen>\s*<code>([^<]+)<\/code>\s*<location>([^<]*)<\/location>\s*<qty>([^<]*)<\/qty>\s*<\/almacen>/g)];
   try {
-    const sb = await getSbAdmin();
-    const { data: existing } = await sb.from('products').select('codigo_producto').eq('codigo_producto', codProducto).maybeSingle();
+    const { rows: existing } = await pool.query(
+      "SELECT codigo_producto FROM public.products WHERE codigo_producto = $1 LIMIT 1",
+      [codProducto]
+    );
     const upsertData = { codigo_producto: codProducto, descripcion, precio_referencia: precioUSD };
     if (almacenes.length > 0) {
       for (const a of almacenes) {
@@ -727,15 +715,255 @@ app.post("/api/agent/mercatech/update", requireMercatechToken, async (req, res) 
         if (code === '8' || code === 'odoo' || code === '2') upsertData.stock_sabana_grande = qty;
       }
     }
-    if (existing) {
-      await sb.from('products').update(upsertData).eq('codigo_producto', codProducto);
+    if (existing.length > 0) {
+      await pool.query(
+        "UPDATE public.products SET descripcion = $2, precio_referencia = $3, stock_boleita = $4, stock_sabana_grande = $5 WHERE codigo_producto = $1",
+        [codProducto, upsertData.descripcion, upsertData.precio_referencia, upsertData.stock_boleita || 0, upsertData.stock_sabana_grande || 0]
+      );
     } else {
-      await sb.from('products').insert(upsertData);
+      await pool.query(
+        "INSERT INTO public.products (codigo_producto, descripcion, precio_referencia, stock_boleita, stock_sabana_grande) VALUES ($1, $2, $3, $4, $5)",
+        [codProducto, upsertData.descripcion, upsertData.precio_referencia, upsertData.stock_boleita || 0, upsertData.stock_sabana_grande || 0]
+      );
     }
-    res.json({ ok: true, producto: codProducto, actualizado: !!existing });
+    res.json({ ok: true, producto: codProducto, actualizado: existing.length > 0 });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
 });
 
-app.listen(PORT, () => console.log("rg7-agent-api listening on", PORT));
+// =============================================================================
+// Generic Data Proxy (replaces Supabase .from() calls)
+// =============================================================================
+
+const DATA_TABLES_ALLOWED = [
+  'accounts_payable', 'attendance_logs', 'bank_accounts', 'bank_initial_balances',
+  'bank_transfers', 'banks', 'brands', 'cashea_installments', 'couriers', 'customers',
+  'daily_rates', 'deliveries', 'delivery_zones', 'expense_recipients', 'expenses',
+  'fordmac_config', 'income_lines', 'income_payments', 'incomes', 'inventory_movements',
+  'payable_payments', 'physical_inventory', 'physical_inventory_lines', 'products',
+  'purchase_lines', 'purchase_order_lines', 'purchase_orders', 'sellers',
+  'stock_snapshot_lines', 'stock_snapshots', 'suppliers', 'support_messages',
+  'support_tickets', 'sync_logs', 'transfer_drafts', 'transferencias_internas_v4',
+  'user_roles', 'v_envios_nacionales', 'v_latest_stock_by_branch',
+  'v_sales_filters', 'v_sales_lines', 'v_support_tickets', 'v_transferencias_final_v4',
+  'vw_inventory_dashboard_stats', 'vw_inventory_top_discrepancias',
+  'wa_conversations', 'wa_instances', 'wa_messages', 'wa_quick_replies',
+];
+
+function sanitizeIdent(s) {
+  if (typeof s !== 'string') return '';
+  return s.replace(/[^a-z0-9_]/gi, '');
+}
+
+function requireDataAuth(req, res, next) {
+  const h = req.headers["authorization"] || "";
+  const token = h.startsWith("Bearer ") ? h.slice(7) : "";
+  if (!ADMIN_API_TOKEN || token !== ADMIN_API_TOKEN) {
+    return res.status(401).json({ ok: false, error: "unauthorized" });
+  }
+  next();
+}
+
+// GET /api/data/:table — list rows with filters
+app.get("/api/data/:table", requireDataAuth, async (req, res) => {
+  const { table } = req.params;
+  if (!DATA_TABLES_ALLOWED.includes(table)) {
+    return res.status(403).json({ ok: false, error: "table not allowed" });
+  }
+
+  try {
+    const safeTable = sanitizeIdent(table);
+    let selectCols = '*';
+    if (req.query.select) {
+      const cols = req.query.select.split(',').map(c => sanitizeIdent(c.trim())).filter(Boolean);
+      if (cols.length > 0) selectCols = cols.join(', ');
+    }
+
+    let sql = `SELECT ${selectCols} FROM public.${safeTable}`;
+    const params = [];
+    const conditions = [];
+    const orderClauses = [];
+    let limitVal = null;
+    let offsetVal = null;
+    let countExact = req.query.count === 'exact';
+
+    for (const [key, value] of Object.entries(req.query)) {
+      if (['select', 'order', 'limit', 'offset', 'single', 'count', 'range_start', 'range_end', 'id_col'].includes(key)) continue;
+
+      if (key.startsWith('eq_')) {
+        const col = sanitizeIdent(key.slice(3));
+        if (col) { conditions.push(`${col} = $${params.length + 1}`); params.push(value); }
+      } else if (key.startsWith('neq_')) {
+        const col = sanitizeIdent(key.slice(4));
+        if (col) { conditions.push(`${col} != $${params.length + 1}`); params.push(value); }
+      } else if (key.startsWith('in_')) {
+        const col = sanitizeIdent(key.slice(3));
+        if (col && value) {
+          const vals = value.split(',').map(v => v.trim()).filter(Boolean);
+          if (vals.length > 0) {
+            const placeholders = vals.map(v => { params.push(v); return `$${params.length}`; });
+            conditions.push(`${col} IN (${placeholders.join(',')})`);
+          }
+        }
+      } else if (key.startsWith('gt_')) {
+        const col = sanitizeIdent(key.slice(3));
+        if (col) { conditions.push(`${col} > $${params.length + 1}`); params.push(value); }
+      } else if (key.startsWith('gte_')) {
+        const col = sanitizeIdent(key.slice(4));
+        if (col) { conditions.push(`${col} >= $${params.length + 1}`); params.push(value); }
+      } else if (key.startsWith('lt_')) {
+        const col = sanitizeIdent(key.slice(3));
+        if (col) { conditions.push(`${col} < $${params.length + 1}`); params.push(value); }
+      } else if (key.startsWith('lte_')) {
+        const col = sanitizeIdent(key.slice(4));
+        if (col) { conditions.push(`${col} <= $${params.length + 1}`); params.push(value); }
+      } else if (key.startsWith('ilike_')) {
+        const col = sanitizeIdent(key.slice(6));
+        if (col) { conditions.push(`${col} ILIKE $${params.length + 1}`); params.push(value); }
+      } else if (key.startsWith('is_')) {
+        const col = sanitizeIdent(key.slice(3));
+        if (col) { conditions.push(`${col} IS ${value === 'null' ? 'NULL' : value}`); }
+      }
+    }
+
+    if (req.query.order) {
+      const parts = Array.isArray(req.query.order) ? req.query.order : [req.query.order];
+      for (const o of parts) {
+        const [col, dir] = o.split('.');
+        const sc = sanitizeIdent(col);
+        if (sc) orderClauses.push(`${sc} ${dir === 'desc' ? 'DESC' : 'ASC'}`);
+      }
+    }
+
+    if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ');
+    if (orderClauses.length > 0) sql += ' ORDER BY ' + orderClauses.join(', ');
+
+    if (req.query.limit) limitVal = parseInt(req.query.limit);
+    if (req.query.range_start && req.query.range_end) {
+      const start = parseInt(req.query.range_start);
+      const end = parseInt(req.query.range_end);
+      limitVal = end - start + 1;
+      offsetVal = start;
+    }
+    if (req.query.offset) offsetVal = parseInt(req.query.offset);
+    if (limitVal) sql += ` LIMIT ${limitVal}`;
+    if (offsetVal) sql += ` OFFSET ${offsetVal}`;
+
+    let count = null;
+    if (countExact) {
+      const countSql = `SELECT COUNT(*) FROM public.${safeTable}${conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : ''}`;
+      const countResult = await pool.query(countSql, params);
+      count = parseInt(countResult.rows[0].count);
+    }
+
+    const { rows } = await pool.query(sql, params);
+
+    if (req.query.single === 'true') {
+      return res.json({ ok: true, data: rows[0] || null });
+    }
+
+    const result = { ok: true, data: rows };
+    if (count !== null) result.count = count;
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/data/:table — insert row(s)
+app.post("/api/data/:table", requireDataAuth, async (req, res) => {
+  const { table } = req.params;
+  if (!DATA_TABLES_ALLOWED.includes(table)) {
+    return res.status(403).json({ ok: false, error: "table not allowed" });
+  }
+
+  try {
+    const safeTable = sanitizeIdent(table);
+    const body = req.body;
+    const isArray = Array.isArray(body);
+    const rows = isArray ? body : [body];
+
+    if (rows.length === 0) return res.status(400).json({ ok: false, error: "empty body" });
+
+    const cols = Object.keys(rows[0]);
+    const safeCols = cols.map(c => sanitizeIdent(c)).filter(Boolean);
+
+    const allParams = [];
+    const valuePlaceholders = rows.map(row => {
+      return '(' + safeCols.map((c, i) => {
+        allParams.push(row[cols[i]]);
+        return `$${allParams.length}`;
+      }).join(',') + ')';
+    });
+
+    let sql = `INSERT INTO public.${safeTable} (${safeCols.join(',')}) VALUES ${valuePlaceholders.join(',')}`;
+    if (req.query.select === 'true' || req.query.returning) {
+      sql += ' RETURNING *';
+    }
+
+    const { rows: inserted } = await pool.query(sql, allParams);
+    res.json({ ok: true, data: isArray ? inserted : (inserted[0] || rows[0]) });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/data/:table/:id — update row by id
+app.patch("/api/data/:table/:id", requireDataAuth, async (req, res) => {
+  const { table, id } = req.params;
+  if (!DATA_TABLES_ALLOWED.includes(table)) {
+    return res.status(403).json({ ok: false, error: "table not allowed" });
+  }
+
+  try {
+    const safeTable = sanitizeIdent(table);
+    const idCol = sanitizeIdent(req.query.id_col || 'id');
+    if (!idCol) return res.status(400).json({ ok: false, error: "invalid id_col" });
+
+    const body = req.body;
+    const cols = Object.keys(body);
+    if (cols.length === 0) return res.status(400).json({ ok: false, error: "empty body" });
+
+    const params = [];
+    const setClauses = cols.map(c => {
+      const sc = sanitizeIdent(c);
+      params.push(body[c]);
+      return `${sc} = $${params.length}`;
+    });
+    params.push(id);
+
+    const sql = `UPDATE public.${safeTable} SET ${setClauses.join(',')} WHERE ${idCol} = $${params.length} RETURNING *`;
+    const { rows: updated } = await pool.query(sql, params);
+    res.json({ ok: true, data: updated[0] || null });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// DELETE /api/data/:table/:id — delete row by id
+app.delete("/api/data/:table/:id", requireDataAuth, async (req, res) => {
+  const { table, id } = req.params;
+  if (!DATA_TABLES_ALLOWED.includes(table)) {
+    return res.status(403).json({ ok: false, error: "table not allowed" });
+  }
+
+  try {
+    const safeTable = sanitizeIdent(table);
+    const idCol = sanitizeIdent(req.query.id_col || 'id');
+    if (!idCol) return res.status(400).json({ ok: false, error: "invalid id_col" });
+
+    const { rowCount } = await pool.query(
+      `DELETE FROM public.${safeTable} WHERE ${idCol} = $1`,
+      [id]
+    );
+    res.json({ ok: true, deleted: rowCount });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// =============================================================================
+// Start server
+// =============================================================================
+app.listen(PORT, () => console.log("restaurantdp-server listening on", PORT));

@@ -1,0 +1,34 @@
+# restaurantdp — Caddy reverse proxy configuration
+# Replace tudominio.com with your actual domain
+
+tudominio.com {
+    # Static frontend (SPA)
+    root * /usr/share/caddy
+    try_files {path} /index.html
+
+    # API backend proxy
+    handle_path /api/* {
+        reverse_proxy backend:3003
+    }
+
+    # Agent API
+    handle_path /api/agent/* {
+        reverse_proxy backend:3003
+    }
+
+    # Security headers
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Gzip
+    encode gzip
+
+    # Logs
+    log {
+        output file /var/log/caddy/access.log
+    }
+}

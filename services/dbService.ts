@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { api } from './apiClient';
 import { Product, Supplier, PurchaseLine, SalesLine, SyncLog, Seller, Courier, CasheaInstallment, BankTransfer, SupportTicket, Delivery, DeliveryStatus, PaymentStatus, AccountPayable, PayablePayment, BankAccount, DeliveryZone } from '../types';
 
 function toLocalDateStr(date: Date): string {
@@ -1079,31 +1080,25 @@ export const dbService = {
     }
   },
 
-  // Sellers
+  // Sellers (via API proxy with Supabase fallback)
   async getSellers(): Promise<Seller[]> {
-    const { data, error } = await supabase
-      .from('sellers')
-      .select('*')
-      .eq('active', true)
-      .order('name');
-    if (error) {
-      console.error('Error in getSellers:', error);
-      throw error;
-    }
+    try {
+      const { data, error } = await api.from('sellers').select('*').eq('active', true).order('name');
+      if (!error && data) return data;
+    } catch (e) { console.warn('api.getSellers fallback:', e); }
+    const { data, error } = await supabase.from('sellers').select('*').eq('active', true).order('name');
+    if (error) { console.error('Error in getSellers:', error); throw error; }
     return data || [];
   },
 
-  // Couriers
+  // Couriers (via API proxy with Supabase fallback)
   async getCouriers(): Promise<Courier[]> {
-    const { data, error } = await supabase
-      .from('couriers')
-      .select('*')
-      .eq('active', true)
-      .order('name');
-    if (error) {
-      console.error('Error in getCouriers:', error);
-      throw error;
-    }
+    try {
+      const { data, error } = await api.from('couriers').select('*').eq('active', true).order('name');
+      if (!error && data) return data;
+    } catch (e) { console.warn('api.getCouriers fallback:', e); }
+    const { data, error } = await supabase.from('couriers').select('*').eq('active', true).order('name');
+    if (error) { console.error('Error in getCouriers:', error); throw error; }
     return data || [];
   },
 

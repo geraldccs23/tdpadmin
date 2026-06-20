@@ -28,6 +28,10 @@ import {
   PieChart,
   DollarSign,
   Key,
+  UtensilsCrossed,
+  CookingPot,
+  ScrollText,
+  ClipboardList,
 } from "lucide-react";
 import { dbService } from "./services/dbService";
 import { supabase } from "./services/supabase";
@@ -71,6 +75,14 @@ import { Integrations } from "./pages/Integrations";
 import { IntercompanyModule } from "./pages/IntercompanyModule";
 import { SupportBubble } from "./pages/SupportBubble";
 import { InventoryDashboard } from "./pages/InventoryDashboard";
+import { DashboardRestaurant } from "./pages/DashboardRestaurant";
+import { MenuManagement } from "./pages/MenuManagement";
+import { PublicMenu } from "./pages/PublicMenu";
+import { POS } from "./pages/POS";
+import { Orders } from "./pages/Orders";
+import { KitchenPanel } from "./pages/KitchenPanel";
+import { Ingredients } from "./pages/Ingredients";
+import { Recipes } from "./pages/Recipes";
 
 type View =
   | "dashboard"
@@ -110,7 +122,15 @@ type View =
   | "crm"
   | "integrations"
   | "intercompany"
-  | "inventory_dashboard";
+  | "inventory_dashboard"
+  | "dashboard_restaurant"
+  | "menu_management"
+  | "public_menu"
+  | "pos"
+  | "orders"
+  | "kitchen_panel"
+  | "ingredients"
+  | "recipes";
 export type Role =
   | "director"
   | "supervisor"
@@ -123,7 +143,9 @@ export type Role =
   | "soporte"
   | "delivery"
   | "supervisor_almacen"
-  | "almacenista";
+  | "almacenista"
+  | "admin"
+  | "cocina";
 
 const rolePermissions: Record<Role, View[]> = {
   director: [
@@ -302,6 +324,62 @@ const rolePermissions: Record<Role, View[]> = {
     "support",
     "attendance_mark",
   ],
+  admin: [
+    "dashboard_restaurant",
+    "menu_management",
+    "public_menu",
+    "pos",
+    "orders",
+    "kitchen_panel",
+    "ingredients",
+    "recipes",
+    "dashboard",
+    "inventory",
+    "erp_inventory",
+    "suppliers",
+    "sales",
+    "purchases",
+    "sync",
+    "settings",
+    "fordmac",
+    "income",
+    "expenses",
+    "banks",
+    "admin_dashboard",
+    "cashea",
+    "customers",
+    "cxc",
+    "cxp",
+    "internal_transfers",
+    "purchase_orders",
+    "cashier_closing",
+    "support",
+    "commissions",
+    "sales_dashboard",
+    "delivery_dashboard",
+    "seller_performance",
+    "bank_history",
+    "attendance_admin",
+    "attendance_mark",
+    "attendance_qr",
+    "national_shipping",
+    "director_logistics",
+    "expenses_dashboard",
+    "delivery_panel",
+    "warehouse",
+    "crm",
+    "integrations",
+    "intercompany",
+    "inventory_dashboard",
+  ],
+  cocina: [
+    "kitchen_panel",
+    "orders",
+    "ingredients",
+    "recipes",
+    "dashboard_restaurant",
+    "support",
+  ],
 };
 
 const defaultViews: Record<Role, View> = {
@@ -317,6 +395,8 @@ const defaultViews: Record<Role, View> = {
   delivery: "delivery_panel",
   supervisor_almacen: "warehouse",
   almacenista: "warehouse",
+  admin: "dashboard_restaurant",
+  cocina: "kitchen_panel",
 };
 
 interface NavItemProps {
@@ -519,10 +599,10 @@ export default function App() {
         <div className="p-6 flex items-center justify-between border-b border-gray-800 min-w-[256px]">
           <div className="flex flex-col">
             <span className="text-2xl font-bold tracking-tighter">
-              RG7<span className="text-[#D40000]">ERP</span>
+              Restaurant<span className="text-[#D40000]">DP</span>
             </span>
             <span className="text-[9px] text-gray-500 uppercase tracking-widest font-black">
-              Admin Core
+              Restaurant ERP
             </span>
           </div>
           <button
@@ -534,6 +614,98 @@ export default function App() {
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto min-w-[256px]">
+          {/* ======================= RESTAURANTE ======================= */}
+          <div className="pb-2 mb-2">
+            {(isSidebarOpen || window.innerWidth < 768) && (
+              <div className="px-4 py-2 bg-green-500/10 border-l-2 border-green-500 mb-2">
+                <span className="text-[11px] text-green-400 uppercase font-black tracking-widest">
+                  RESTAURANTE
+                </span>
+              </div>
+            )}
+          </div>
+
+          <NavItem
+            icon={LayoutDashboard}
+            label="Dashboard"
+            view="dashboard_restaurant"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["admin", "supervisor", "cocina", "cajero", "compras"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={UtensilsCrossed}
+            label="Menú"
+            view="menu_management"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["admin", "supervisor"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={ShoppingCart}
+            label="POS / Pedidos"
+            view="pos"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["admin", "cajero", "supervisor"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={ClipboardList}
+            label="Lista Pedidos"
+            view="orders"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["admin", "cajero", "cocina", "supervisor"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={CookingPot}
+            label="Cocina"
+            view="kitchen_panel"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["admin", "cocina", "supervisor"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={Package}
+            label="Ingredientes"
+            view="ingredients"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["admin", "compras", "supervisor", "cocina"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={ScrollText}
+            label="Recetas"
+            view="recipes"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["admin", "compras", "supervisor"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={Globe}
+            label="Menú Público"
+            view="public_menu"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["admin", "supervisor"]}
+            userRole={userRole}
+          />
+
           {/* ======================= PROFIT PLUS ======================= */}
           <div className="pb-2 mb-2">
             {(isSidebarOpen || window.innerWidth < 768) && (
@@ -1207,12 +1379,28 @@ export default function App() {
                                                                       ? "Inter-empresas"
                                                                       : activeView ===
                                                                         "inventory_dashboard"
-                                                                      ? "Dashboard de Inventario"
-                                                                      : activeView}
+                                                                       ? "Dashboard de Inventario"
+                                                                       : activeView === "dashboard_restaurant"
+                                                                       ? "Dashboard"
+                                                                       : activeView === "menu_management"
+                                                                       ? "Gestión de Menú"
+                                                                       : activeView === "public_menu"
+                                                                       ? "Menú Público"
+                                                                       : activeView === "pos"
+                                                                       ? "Punto de Venta"
+                                                                       : activeView === "orders"
+                                                                       ? "Pedidos"
+                                                                       : activeView === "kitchen_panel"
+                                                                       ? "Panel de Cocina"
+                                                                       : activeView === "ingredients"
+                                                                       ? "Ingredientes"
+                                                                       : activeView === "recipes"
+                                                                       ? "Recetas"
+                                                                       : activeView}
               </h1>
               <div className="h-4 w-px bg-gray-200 hidden sm:block"></div>
               <span className="text-[10px] md:text-xs text-gray-400 font-medium hidden sm:block">
-                RG7 Autopartes
+                RestaurantDP
               </span>
             </div>
           </div>
@@ -1299,6 +1487,14 @@ export default function App() {
               {activeView === "inventory_dashboard" && <InventoryDashboard />}
               {activeView === "settings" && <SettingsComponent />}
               {activeView === "expenses_dashboard" && <ExpensesDashboard />}
+              {activeView === "dashboard_restaurant" && <DashboardRestaurant />}
+              {activeView === "menu_management" && <MenuManagement />}
+              {activeView === "public_menu" && <PublicMenu />}
+              {activeView === "pos" && <POS />}
+              {activeView === "orders" && <Orders />}
+              {activeView === "kitchen_panel" && <KitchenPanel />}
+              {activeView === "ingredients" && <Ingredients />}
+              {activeView === "recipes" && <Recipes />}
             </>
           )}
         </div>
