@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   Building2, FileText, Hash, Percent, MapPin, Warehouse, Landmark, Shield,
-  Plus, X, Save, Pencil, Trash2, Globe, Briefcase, CheckCircle
+  Plus, X, Save, Pencil, Trash2, Globe, Briefcase, CheckCircle,
+  DollarSign, Users, Calendar, AlertTriangle
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
@@ -20,18 +21,23 @@ const TABS = [
   { key: 'fiscal-entities', label: 'Empresas fiscales', icon: Briefcase },
   { key: 'branches', label: 'Sucursales', icon: MapPin },
   { key: 'warehouses', label: 'Depósitos', icon: Warehouse },
-  { key: 'fiscal-providers', label: 'Fiscal / SENIAT', icon: FileText },
-  { key: 'document-sequences', label: 'Correlativos', icon: Hash },
   { key: 'tax-rates', label: 'Impuestos', icon: Percent },
+  { key: 'national-taxes', label: 'Impuestos Nacionales', icon: DollarSign },
+  { key: 'parafiscal-obligations', label: 'Parafiscales', icon: Users },
+  { key: 'compliance-calendar', label: 'Calendario Fiscal', icon: Calendar },
+  { key: 'fiscal-providers', label: 'Proveedores Fiscales', icon: FileText },
+  { key: 'document-sequences', label: 'Correlativos', icon: Hash },
   { key: 'municipal-tax', label: 'Alcaldía / Municipio', icon: Landmark },
   { key: 'legal-permits', label: 'Permisos', icon: Shield },
 ];
 
-const ENTITY = {
+const ENTITY: Record<string, string> = {
   company: 'company', 'fiscal-entities': 'fiscal-entities', branches: 'branches',
   warehouses: 'warehouses', 'fiscal-providers': 'fiscal-providers',
   'document-sequences': 'document-sequences', 'tax-rates': 'tax-rates',
   'municipal-tax': 'municipal-tax', 'legal-permits': 'legal-permits',
+  'national-taxes': 'national-taxes', 'parafiscal-obligations': 'parafiscal-obligations',
+  'compliance-calendar': 'compliance-calendar',
 };
 
 const FIELD_DEFS: Record<string, { key: string; label: string; type?: string; options?: string[] }[]> = {
@@ -49,6 +55,7 @@ const FIELD_DEFS: Record<string, { key: string; label: string; type?: string; op
     { key: 'legal_name', label: 'Razón social' },
     { key: 'commercial_name', label: 'Nombre comercial' },
     { key: 'rif', label: 'RIF' },
+    { key: 'taxpayer_type', label: 'Tipo contribuyente', type: 'select', options: ['ordinario', 'formal', 'especial', 'ocasional'] },
     { key: 'fiscal_address', label: 'Domicilio fiscal' },
     { key: 'tax_responsibility', label: 'Responsabilidad fiscal' },
     { key: 'economic_activity', label: 'Actividad económica' },
@@ -56,6 +63,12 @@ const FIELD_DEFS: Record<string, { key: string; label: string; type?: string; op
     { key: 'legal_rep_id', label: 'Cédula / RIF del representante' },
     { key: 'phone', label: 'Teléfono' },
     { key: 'email', label: 'Email' },
+    { key: 'seniat_username', label: 'Usuario SENIAT' },
+    { key: 'special_taxpayer_since', label: 'Contribuyente especial desde', type: 'date' },
+    { key: 'special_taxpayer_providence', label: 'Providencia SENIAT' },
+    { key: 'is_iva_withholding_agent', label: 'Agente de retención IVA', type: 'checkbox' },
+    { key: 'is_igtf_applicable', label: 'Sujeto a IGTF', type: 'checkbox' },
+    { key: 'igtf_rate', label: 'Tasa IGTF (%)', type: 'number' },
     { key: 'is_default', label: 'Empresa principal', type: 'checkbox' },
   ],
   branches: [
@@ -73,37 +86,72 @@ const FIELD_DEFS: Record<string, { key: string; label: string; type?: string; op
     { key: 'name', label: 'Nombre' },
     { key: 'address', label: 'Dirección' },
   ],
-  'fiscal-providers': [
-    { key: 'name', label: 'Nombre' },
-    { key: 'provider_type', label: 'Tipo', type: 'select', options: ['printer', 'provider', 'software'] },
-    { key: 'model', label: 'Modelo' },
-    { key: 'serial_number', label: 'Serial' },
-  ],
-  'document-sequences': [
-    { key: 'document_type', label: 'Tipo', type: 'select', options: ['invoice', 'credit_note', 'debit_note', 'purchase', 'other'] },
-    { key: 'serie', label: 'Serie' },
-    { key: 'prefix', label: 'Prefijo' },
-    { key: 'suffix', label: 'Sufijo' },
-    { key: 'next_number', label: 'Siguiente número', type: 'number' },
-    { key: 'control_number', label: 'Número de control' },
-  ],
   'tax-rates': [
     { key: 'name', label: 'Nombre' },
     { key: 'rate', label: 'Tasa (%)', type: 'number' },
     { key: 'type', label: 'Tipo', type: 'select', options: ['iva', 'municipal', 'other'] },
   ],
+  'national-taxes': [
+    { key: 'tax_code', label: 'Código' },
+    { key: 'name', label: 'Nombre' },
+    { key: 'rate', label: 'Tasa (%)', type: 'number' },
+    { key: 'frequency', label: 'Frecuencia', type: 'select', options: ['mensual', 'quincenal', 'anual', 'eventual'] },
+    { key: 'applies', label: 'Aplica', type: 'checkbox' },
+  ],
+  'parafiscal-obligations': [
+    { key: 'obligation_code', label: 'Código' },
+    { key: 'name', label: 'Nombre' },
+    { key: 'employer_rate', label: 'Tasa patronal (%)', type: 'number' },
+    { key: 'employee_rate', label: 'Tasa trabajador (%)', type: 'number' },
+    { key: 'frequency', label: 'Frecuencia', type: 'select', options: ['mensual', 'quincenal', 'anual', 'eventual'] },
+    { key: 'applies', label: 'Aplica', type: 'checkbox' },
+  ],
+  'compliance-calendar': [
+    { key: 'obligation_type', label: 'Tipo', type: 'select', options: ['IVA', 'ISLR', 'IGTF', 'IVSS', 'FAOV', 'INCES', 'PATENTE', 'BOMBEROS', 'SANIDAD', 'LICORES'] },
+    { key: 'title', label: 'Título' },
+    { key: 'frequency', label: 'Frecuencia', type: 'select', options: ['mensual', 'quincenal', 'anual', 'eventual'] },
+    { key: 'due_day', label: 'Día de vencimiento', type: 'number' },
+    { key: 'next_due_date', label: 'Próximo vencimiento', type: 'date' },
+    { key: 'status', label: 'Estado', type: 'select', options: ['pending', 'completed', 'overdue', 'cancelled'] },
+  ],
+  'fiscal-providers': [
+    { key: 'name', label: 'Nombre' },
+    { key: 'provider_type', label: 'Tipo', type: 'select', options: ['impresora_fiscal', 'proveedor_digital', 'forma_libre', 'maquina_fiscal'] },
+    { key: 'model', label: 'Modelo' },
+    { key: 'serial_number', label: 'Serial' },
+    { key: 'authorization_number', label: 'Número de autorización' },
+    { key: 'provider_rif', label: 'RIF del proveedor' },
+  ],
+  'document-sequences': [
+    { key: 'document_type', label: 'Tipo', type: 'select', options: ['factura', 'nota_credito', 'nota_debito', 'pedido', 'orden_compra', 'cierre_caja'] },
+    { key: 'serie', label: 'Serie' },
+    { key: 'prefix', label: 'Prefijo' },
+    { key: 'suffix', label: 'Sufijo' },
+    { key: 'next_number', label: 'Siguiente número', type: 'number' },
+    { key: 'control_number', label: 'Número de control', type: 'number' },
+  ],
   'municipal-tax': [
     { key: 'municipality', label: 'Municipio' },
+    { key: 'mayor_office', label: 'Alcaldía' },
+    { key: 'license_number', label: 'Número de licencia' },
     { key: 'patent_number', label: 'Número de patente' },
-    { key: 'patent_expiry', label: 'Vencimiento', type: 'date' },
-    { key: 'tax_rate', label: 'Tasa (%)', type: 'number' },
+    { key: 'economic_activity_code', label: 'Código actividad económica' },
+    { key: 'economic_activity_name', label: 'Actividad económica' },
+    { key: 'gross_income_rate', label: 'Tasa ingresos brutos (%)', type: 'number' },
+    { key: 'advertising_tax_applies', label: 'Aplica tasa publicidad', type: 'checkbox' },
+    { key: 'urban_cleaning_fee_applies', label: 'Aplica aseo urbano', type: 'checkbox' },
+    { key: 'payment_frequency', label: 'Frecuencia pago', type: 'select', options: ['trimestral', 'mensual', 'semestral', 'anual'] },
+    { key: 'patent_expiry', label: 'Vencimiento patente', type: 'date' },
   ],
   'legal-permits': [
-    { key: 'permit_type', label: 'Tipo', type: 'select', options: ['bomberos', 'sanidad', 'licores', 'gobernacion', 'other'] },
+    { key: 'permit_type', label: 'Tipo', type: 'select', options: ['bomberos', 'sanidad', 'licores', 'manipulacion_alimentos', 'proteccion_civil', 'otro'] },
     { key: 'permit_number', label: 'Número' },
+    { key: 'issued_by', label: 'Emitido por' },
     { key: 'issue_date', label: 'Emisión', type: 'date' },
-    { key: 'expiry_date', label: 'Vencimiento', type: 'date' },
-    { key: 'file_url', label: 'URL del documento' },
+    { key: 'expiration_date', label: 'Vencimiento', type: 'date' },
+    { key: 'status', label: 'Estado', type: 'select', options: ['active', 'expired', 'pending'] },
+    { key: 'attachment_url', label: 'URL del documento' },
+    { key: 'notes', label: 'Notas' },
   ],
 };
 
@@ -127,6 +175,16 @@ const ENTITY_RELATIONS: Record<string, { key: string; label: string; fk: string 
     { key: 'branches', label: 'Sucursal (opcional)', fk: 'branch_id' },
   ],
   'legal-permits': [
+    { key: 'fiscal-entities', label: 'Empresa fiscal', fk: 'fiscal_entity_id' },
+    { key: 'branches', label: 'Sucursal (opcional)', fk: 'branch_id' },
+  ],
+  'national-taxes': [
+    { key: 'fiscal-entities', label: 'Empresa fiscal', fk: 'fiscal_entity_id' },
+  ],
+  'parafiscal-obligations': [
+    { key: 'fiscal-entities', label: 'Empresa fiscal', fk: 'fiscal_entity_id' },
+  ],
+  'compliance-calendar': [
     { key: 'fiscal-entities', label: 'Empresa fiscal', fk: 'fiscal_entity_id' },
     { key: 'branches', label: 'Sucursal (opcional)', fk: 'branch_id' },
   ],

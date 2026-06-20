@@ -1132,6 +1132,9 @@ const SETTINGS_TABLES = {
   'fiscal-providers': 'fiscal_printers_or_providers',
   'municipal-tax': 'municipal_tax_settings',
   'legal-permits': 'legal_permits',
+  'national-taxes': 'national_tax_settings',
+  'parafiscal-obligations': 'parafiscal_obligations',
+  'compliance-calendar': 'compliance_calendar',
 };
 
 // GET /api/settings/:entity — list (or first row for company/singleton tables)
