@@ -29,9 +29,9 @@ const JWT_SECRET = process.env.JWT_SECRET || "change_me";
 // --------------------
 // JWT auth
 // --------------------
-function generateToken(user) {
+function generateToken(user, permissions) {
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role, name: user.name },
+    { id: user.id, email: user.email, role: user.role, name: user.name, permissions: permissions || {} },
     JWT_SECRET,
     { expiresIn: "24h" }
   );
@@ -75,11 +75,20 @@ app.post("/api/auth/login", async (req, res) => {
     if (!valid) {
       return res.status(401).json({ ok: false, error: "invalid credentials" });
     }
-    const token = generateToken(user);
+    // Fetch role permissions
+    let permissions = {};
+    try {
+      const { rows: roleRows } = await pool.query(
+        "SELECT permissions FROM public.roles WHERE name = $1 AND is_active = true LIMIT 1",
+        [user.role]
+      );
+      if (roleRows.length > 0) permissions = roleRows[0].permissions || {};
+    } catch {}
+    const token = generateToken(user, permissions);
     res.json({
       ok: true,
       token,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      user: { id: user.id, email: user.email, name: user.name, role: user.role, permissions },
     });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
@@ -88,9 +97,18 @@ app.post("/api/auth/login", async (req, res) => {
 
 // GET /api/auth/session
 app.get("/api/auth/session", requireJwt, async (req, res) => {
+  // Fetch latest permissions from DB in case role was updated
+  let permissions = req.user.permissions || {};
+  try {
+    const { rows } = await pool.query(
+      "SELECT permissions FROM public.roles WHERE name = $1 AND is_active = true LIMIT 1",
+      [req.user.role]
+    );
+    if (rows.length > 0) permissions = rows[0].permissions || {};
+  } catch {}
   res.json({
     ok: true,
-    user: { id: req.user.id, email: req.user.email, name: req.user.name, role: req.user.role },
+    user: { id: req.user.id, email: req.user.email, name: req.user.name, role: req.user.role, permissions },
   });
 });
 
@@ -109,6 +127,16 @@ function requireAdmin(req, res, next) {
     }
     next();
   });
+}
+
+// Permission check helper (for future use)
+function requirePermission(module, action) {
+  return (req, res, next) => {
+    if (req.user?.role === "admin") return next();
+    const perms = req.user?.permissions || {};
+    if (perms[module]?.[action]) return next();
+    return res.status(403).json({ ok: false, error: "forbidden" });
+  };
 }
 
 // --------------------
@@ -134,8 +162,7 @@ app.post("/api/users", requireAdmin, async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ ok: false, error: "email and password required" });
     }
-    const validRoles = ["admin", "manager", "cashier", "kitchen", "waiter"];
-    const userRole = validRoles.includes(role) ? role : "waiter";
+    const userRole = role || "waiter";
     const hash = bcrypt.hashSync(password, 10);
     const { rows } = await pool.query(
       "INSERT INTO public.users (email, name, role, password_hash) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role, is_active, created_at, updated_at",
@@ -198,7 +225,7 @@ app.delete("/api/users/:id", requireAdmin, async (req, res) => {
 app.get("/api/roles", requireAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      "SELECT id, name, label, description, is_active, created_at, updated_at FROM public.roles ORDER BY label ASC"
+      "SELECT id, name, label, description, permissions, is_active, created_at, updated_at FROM public.roles ORDER BY label ASC"
     );
     res.json({ ok: true, roles: rows });
   } catch (e) {
@@ -226,17 +253,18 @@ app.post("/api/roles", requireAdmin, async (req, res) => {
 app.patch("/api/roles/:id", requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { label, description, is_active } = req.body || {};
+    const { label, description, is_active, permissions } = req.body || {};
     const sets = [];
     const params = [];
     let idx = 0;
     if (label !== undefined) { idx++; sets.push(`label = $${idx}`); params.push(label); }
     if (description !== undefined) { idx++; sets.push(`description = $${idx}`); params.push(description); }
     if (is_active !== undefined) { idx++; sets.push(`is_active = $${idx}`); params.push(is_active); }
+    if (permissions !== undefined) { idx++; sets.push(`permissions = $${idx}`); params.push(JSON.stringify(permissions)); }
     if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields to update" });
     idx++; params.push(id);
     const { rows } = await pool.query(
-      `UPDATE public.roles SET ${sets.join(", ")} WHERE id = $${idx} RETURNING id, name, label, description, is_active, created_at, updated_at`,
+      `UPDATE public.roles SET ${sets.join(", ")} WHERE id = $${idx} RETURNING id, name, label, description, permissions, is_active, created_at, updated_at`,
       params
     );
     if (rows.length === 0) return res.status(404).json({ ok: false, error: "role not found" });

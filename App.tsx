@@ -412,10 +412,16 @@ interface NavItemProps {
   onClick: (view: View) => void;
   allowedRoles: Role[];
   userRole: Role;
+  perm?: string;
+  userPermissions?: any;
 }
 
 const NavItem = (props: NavItemProps) => {
   if (!props.allowedRoles.includes(props.userRole)) return null;
+  if (props.perm && props.userPermissions && props.userRole !== "admin") {
+    const [mod, action] = props.perm.split(".");
+    if (!props.userPermissions[mod]?.[action]) return null;
+  }
 
   const Icon = props.icon;
   const isActive = props.activeView === props.view;
@@ -440,6 +446,7 @@ const NavItem = (props: NavItemProps) => {
 export default function App() {
   const [session, setSession] = useState<any>(null);
   const [userRole, setUserRole] = useState<Role | null>(null);
+  const [permissions, setPermissions] = useState<any>(null);
   const [activeView, setActiveView] = useState<View>("dashboard_restaurant");
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
   const [isRateModalOpen, setIsRateModalOpen] = useState(false);
@@ -496,6 +503,7 @@ export default function App() {
   useEffect(() => {
     auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      setPermissions(session?.user?.permissions || null);
       if (session?.user?.role) {
         fetchUserRole(null, "", session.user.role);
       } else if (session?.user?.id) {
@@ -507,6 +515,7 @@ export default function App() {
       data: { subscription },
     } = auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      setPermissions(session?.user?.permissions || null);
       if (session?.user?.role) {
         fetchUserRole(null, "", session.user.role);
       } else if (session?.user?.id) {
@@ -650,6 +659,8 @@ export default function App() {
             onClick={handleSetView}
             allowedRoles={["admin", "supervisor", "cocina", "cajero", "compras"]}
             userRole={userRole}
+            perm="dashboard.view"
+            userPermissions={permissions}
           />
           <NavItem
             icon={UtensilsCrossed}
@@ -660,6 +671,8 @@ export default function App() {
             onClick={handleSetView}
             allowedRoles={["admin", "supervisor"]}
             userRole={userRole}
+            perm="menu.view"
+            userPermissions={permissions}
           />
           <NavItem
             icon={ShoppingCart}
@@ -670,6 +683,8 @@ export default function App() {
             onClick={handleSetView}
             allowedRoles={["admin", "cajero", "supervisor"]}
             userRole={userRole}
+            perm="pos.view"
+            userPermissions={permissions}
           />
           <NavItem
             icon={ClipboardList}
@@ -680,6 +695,8 @@ export default function App() {
             onClick={handleSetView}
             allowedRoles={["admin", "cajero", "cocina", "supervisor"]}
             userRole={userRole}
+            perm="orders.view"
+            userPermissions={permissions}
           />
           <NavItem
             icon={CookingPot}
@@ -690,6 +707,8 @@ export default function App() {
             onClick={handleSetView}
             allowedRoles={["admin", "cocina", "supervisor"]}
             userRole={userRole}
+            perm="kitchen.view"
+            userPermissions={permissions}
           />
           <NavItem
             icon={Package}
@@ -700,6 +719,8 @@ export default function App() {
             onClick={handleSetView}
             allowedRoles={["admin", "compras", "supervisor", "cocina"]}
             userRole={userRole}
+            perm="inventory.view"
+            userPermissions={permissions}
           />
           <NavItem
             icon={ScrollText}
@@ -710,6 +731,8 @@ export default function App() {
             onClick={handleSetView}
             allowedRoles={["admin", "compras", "supervisor"]}
             userRole={userRole}
+            perm="recipes.view"
+            userPermissions={permissions}
           />
           <NavItem
             icon={Globe}
@@ -720,6 +743,8 @@ export default function App() {
             onClick={handleSetView}
             allowedRoles={["admin", "supervisor"]}
             userRole={userRole}
+            perm="menu.view"
+            userPermissions={permissions}
           />
 
           {userRole === "admin" && (
@@ -740,6 +765,8 @@ export default function App() {
               onClick={handleSetView}
               allowedRoles={["admin"]}
               userRole={userRole}
+              perm="users.view"
+              userPermissions={permissions}
             />
             <NavItem
               icon={SettingsIcon}
@@ -750,6 +777,8 @@ export default function App() {
               onClick={handleSetView}
               allowedRoles={["admin"]}
               userRole={userRole}
+              perm="settings.view"
+              userPermissions={permissions}
             />
             <NavItem
               icon={Key}
@@ -760,6 +789,8 @@ export default function App() {
               onClick={handleSetView}
               allowedRoles={["admin"]}
               userRole={userRole}
+              perm="settings.view"
+              userPermissions={permissions}
             />
             </>
           )}

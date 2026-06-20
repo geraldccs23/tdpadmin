@@ -158,12 +158,31 @@ function UsersTab({ roles }: { roles: any[] }) {
   );
 }
 
+const PERMISSION_MODULES: Record<string, string[]> = {
+  dashboard: ['view'],
+  pos: ['view', 'create', 'refund'],
+  orders: ['view', 'create', 'update', 'cancel'],
+  kitchen: ['view', 'update'],
+  menu: ['view', 'create', 'update', 'delete'],
+  inventory: ['view', 'create', 'update', 'adjust'],
+  recipes: ['view', 'create', 'update', 'delete'],
+  purchases: ['view', 'create', 'update'],
+  reports: ['view'],
+  users: ['view', 'create', 'update', 'delete'],
+  roles: ['view', 'create', 'update', 'delete'],
+  settings: ['view', 'update'],
+  support: ['view', 'update'],
+};
+
 function RolesTab() {
   const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({ name: '', label: '', description: '' });
   const [error, setError] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editPerms, setEditPerms] = useState<any>({});
+  const [saving, setSaving] = useState(false);
 
   const fetchRoles = async () => {
     setLoading(true);
@@ -190,6 +209,30 @@ function RolesTab() {
   const handleToggleActive = async (role: any) => {
     const json = await api(`/api/roles/${role.id}`, { method: 'PATCH', body: JSON.stringify({ is_active: !role.is_active }) });
     if (json.ok) setRoles(p => p.map(r => r.id === role.id ? json.role : r));
+  };
+
+  const openEditor = (role: any) => {
+    setEditingId(role.id);
+    setEditPerms(JSON.parse(JSON.stringify(role.permissions || {})));
+  };
+
+  const togglePerm = (mod: string, action: string) => {
+    setEditPerms((prev: any) => {
+      const updated = { ...prev };
+      if (!updated[mod]) updated[mod] = {};
+      updated[mod] = { ...updated[mod], [action]: !updated[mod][action] };
+      return updated;
+    });
+  };
+
+  const savePermissions = async (roleId: string) => {
+    setSaving(true);
+    const json = await api(`/api/roles/${roleId}`, { method: 'PATCH', body: JSON.stringify({ permissions: editPerms }) });
+    if (json.ok) {
+      setRoles(p => p.map(r => r.id === roleId ? json.role : r));
+      setEditingId(null);
+    }
+    setSaving(false);
   };
 
   return (
@@ -233,13 +276,13 @@ function RolesTab() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {loading ? <div className="col-span-full p-12 text-center text-gray-400">Cargando...</div>
+      <div className="space-y-4">
+        {loading ? <div className="p-12 text-center text-gray-400">Cargando...</div>
         : roles.length === 0 ? (
-          <div className="col-span-full p-12 text-center"><Tag className="mx-auto text-gray-300 mb-3" size={48} /><p className="text-gray-500 font-medium">No hay roles creados</p></div>
+          <div className="p-12 text-center"><Tag className="mx-auto text-gray-300 mb-3" size={48} /><p className="text-gray-500 font-medium">No hay roles creados</p></div>
         ) : roles.map(role => (
-          <div key={role.id} className={`bg-white rounded-2xl shadow-sm border p-5 transition-all ${!role.is_active ? 'opacity-50' : ''}`}>
-            <div className="flex items-start justify-between mb-3">
+          <div key={role.id} className={`bg-white rounded-2xl shadow-sm border transition-all ${!role.is_active ? 'opacity-50' : ''} ${editingId === role.id ? 'border-[#009FE3] ring-1 ring-[#009FE3]/20' : 'border-gray-100'}`}>
+            <div className="flex items-center justify-between p-5 cursor-pointer" onClick={() => openEditor(role)}>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-[#009FE3]/10 flex items-center justify-center"><Shield size={20} className="text-[#009FE3]" /></div>
                 <div>
@@ -247,13 +290,47 @@ function RolesTab() {
                   <p className="text-xs text-gray-400 font-mono">{role.name}</p>
                 </div>
               </div>
-              <button onClick={() => handleToggleActive(role)}
-                className={`p-1.5 rounded-lg transition-all ${role.is_active ? 'hover:bg-red-50 text-red-400' : 'hover:bg-green-50 text-green-500'}`}
-                title={role.is_active ? 'Desactivar' : 'Activar'}>
-                {role.is_active ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
-              </button>
+              <div className="flex items-center gap-2">
+                {role.description && <span className="text-xs text-gray-400 hidden md:block max-w-[200px] truncate">{role.description}</span>}
+                <button onClick={(e) => { e.stopPropagation(); handleToggleActive(role); }}
+                  className={`p-1.5 rounded-lg transition-all ${role.is_active ? 'hover:bg-red-50 text-red-400' : 'hover:bg-green-50 text-green-500'}`}
+                  title={role.is_active ? 'Desactivar' : 'Activar'}>
+                  {role.is_active ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                </button>
+              </div>
             </div>
-            {role.description && <p className="text-xs text-gray-500 ml-[52px]">{role.description}</p>}
+
+            {editingId === role.id && (
+              <div className="border-t border-gray-100 p-5">
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {Object.entries(PERMISSION_MODULES).map(([mod, actions]) => (
+                    <div key={mod} className="bg-gray-50 rounded-xl p-4">
+                      <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">{mod}</p>
+                      <div className="space-y-2">
+                        {actions.map(action => (
+                          <label key={action} className="flex items-center gap-2.5 cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={!!editPerms[mod]?.[action]}
+                              onChange={() => togglePerm(mod, action)}
+                              className="w-4 h-4 rounded border-gray-300 text-[#009FE3] focus:ring-[#009FE3]/30"
+                            />
+                            <span className="text-sm text-gray-600 group-hover:text-gray-800">{action}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-100">
+                  <button onClick={() => setEditingId(null)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 font-medium">Cancelar</button>
+                  <button onClick={() => savePermissions(role.id)} disabled={saving}
+                    className="px-5 py-2 bg-[#009FE3] text-white rounded-xl text-sm font-semibold hover:bg-[#0088c4] disabled:opacity-50">
+                    {saving ? 'Guardando...' : 'Guardar permisos'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
