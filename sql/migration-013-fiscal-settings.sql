@@ -115,6 +115,46 @@ CREATE TABLE IF NOT EXISTS public.legal_permits (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 9. Empresas fiscales / Razones sociales (multi-entity)
+CREATE TABLE IF NOT EXISTS public.fiscal_entities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  legal_name TEXT NOT NULL,
+  commercial_name TEXT,
+  rif TEXT NOT NULL UNIQUE,
+  fiscal_address TEXT NOT NULL DEFAULT '',
+  tax_responsibility TEXT NOT NULL DEFAULT '',
+  economic_activity TEXT NOT NULL DEFAULT '',
+  legal_representative TEXT NOT NULL DEFAULT '',
+  legal_rep_id TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  email TEXT NOT NULL DEFAULT '',
+  is_default BOOLEAN NOT NULL DEFAULT false,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 10. FK fiscal_entity_id en tablas existentes
+ALTER TABLE public.company_branches ADD COLUMN IF NOT EXISTS fiscal_entity_id UUID REFERENCES public.fiscal_entities(id) ON DELETE SET NULL;
+ALTER TABLE public.company_branches ADD COLUMN IF NOT EXISTS city TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.company_branches ADD COLUMN IF NOT EXISTS state TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.company_branches ADD COLUMN IF NOT EXISTS municipality TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.company_branches ADD COLUMN IF NOT EXISTS manager TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.document_sequences ADD COLUMN IF NOT EXISTS fiscal_entity_id UUID REFERENCES public.fiscal_entities(id) ON DELETE SET NULL;
+ALTER TABLE public.document_sequences ADD COLUMN IF NOT EXISTS serie TEXT NOT NULL DEFAULT 'A';
+ALTER TABLE public.fiscal_printers_or_providers ADD COLUMN IF NOT EXISTS fiscal_entity_id UUID REFERENCES public.fiscal_entities(id) ON DELETE SET NULL;
+ALTER TABLE public.municipal_tax_settings ADD COLUMN IF NOT EXISTS fiscal_entity_id UUID REFERENCES public.fiscal_entities(id) ON DELETE SET NULL;
+ALTER TABLE public.municipal_tax_settings ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES public.company_branches(id) ON DELETE SET NULL;
+ALTER TABLE public.legal_permits ADD COLUMN IF NOT EXISTS fiscal_entity_id UUID REFERENCES public.fiscal_entities(id) ON DELETE SET NULL;
+ALTER TABLE public.legal_permits ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES public.company_branches(id) ON DELETE SET NULL;
+
+-- 11. Índices
+CREATE INDEX IF NOT EXISTS idx_company_branches_fiscal_entity ON public.company_branches(fiscal_entity_id);
+CREATE INDEX IF NOT EXISTS idx_document_sequences_fiscal_entity ON public.document_sequences(fiscal_entity_id);
+CREATE INDEX IF NOT EXISTS idx_fiscal_providers_fiscal_entity ON public.fiscal_printers_or_providers(fiscal_entity_id);
+CREATE INDEX IF NOT EXISTS idx_municipal_tax_fiscal_entity ON public.municipal_tax_settings(fiscal_entity_id);
+CREATE INDEX IF NOT EXISTS idx_legal_permits_fiscal_entity ON public.legal_permits(fiscal_entity_id);
+
 -- =============================================================================
 -- Trigger updated_at
 -- =============================================================================
@@ -129,7 +169,7 @@ $$ LANGUAGE plpgsql;
 DO $$ DECLARE
   t TEXT;
 BEGIN
-  FOR t IN SELECT unnest(ARRAY['company_settings','company_branches','company_warehouses','tax_rates','document_sequences','fiscal_printers_or_providers','municipal_tax_settings','legal_permits'])
+  FOR t IN SELECT unnest(ARRAY['company_settings','fiscal_entities','company_branches','company_warehouses','tax_rates','document_sequences','fiscal_printers_or_providers','municipal_tax_settings','legal_permits'])
   LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS trg_%s_updated_at ON public.%s', t, t);
     EXECUTE format('CREATE TRIGGER trg_%s_updated_at BEFORE UPDATE ON public.%s FOR EACH ROW EXECUTE FUNCTION public.set_settings_updated_at()', t, t);
