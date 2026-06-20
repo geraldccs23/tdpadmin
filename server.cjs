@@ -8,6 +8,8 @@ require('dotenv').config();
 const express = require("express");
 const { Pool } = require("pg");
 const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
 const app = express();
 app.use(express.json({ limit: "25mb" }));
@@ -22,9 +24,83 @@ app.use((_req, res, next) => {
 const PORT = process.env.PORT || 3003;
 const AGENT_TOKEN = process.env.AGENT_TOKEN || "";
 const ADMIN_API_TOKEN = process.env.ADMIN_API_TOKEN || "";
+const JWT_SECRET = process.env.JWT_SECRET || "change_me";
 
 // --------------------
-// Auth middleware
+// JWT auth
+// --------------------
+function generateToken(user) {
+  return jwt.sign(
+    { id: user.id, email: user.email, role: user.role, name: user.name },
+    JWT_SECRET,
+    { expiresIn: "24h" }
+  );
+}
+
+function requireJwt(req, res, next) {
+  const h = req.headers["authorization"] || "";
+  const token = h.startsWith("Bearer ") ? h.slice(7) : "";
+  if (!token) return res.status(401).json({ ok: false, error: "missing token" });
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (e) {
+    return res.status(401).json({ ok: false, error: "invalid or expired token" });
+  }
+}
+
+// POST /api/auth/login
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ ok: false, error: "email and password required" });
+    }
+    const { rows } = await pool.query(
+      "SELECT id, email, name, role, password_hash, is_active FROM public.users WHERE email = $1 LIMIT 1",
+      [email.trim().toLowerCase()]
+    );
+    if (rows.length === 0) {
+      return res.status(401).json({ ok: false, error: "invalid credentials" });
+    }
+    const user = rows[0];
+    if (!user.is_active) {
+      return res.status(401).json({ ok: false, error: "account disabled" });
+    }
+    if (!user.password_hash) {
+      return res.status(401).json({ ok: false, error: "no password set" });
+    }
+    const valid = bcrypt.compareSync(password, user.password_hash);
+    if (!valid) {
+      return res.status(401).json({ ok: false, error: "invalid credentials" });
+    }
+    const token = generateToken(user);
+    res.json({
+      ok: true,
+      token,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/auth/session
+app.get("/api/auth/session", requireJwt, async (req, res) => {
+  res.json({
+    ok: true,
+    user: { id: req.user.id, email: req.user.email, name: req.user.name, role: req.user.role },
+  });
+});
+
+// POST /api/auth/logout
+app.post("/api/auth/logout", requireJwt, async (_req, res) => {
+  res.json({ ok: true });
+});
+
+// --------------------
+// Auth middleware for agent
 // --------------------
 function requireAuth(req, res, next) {
     const h = req.headers["authorization"] || "";

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../services/supabase';
+import { auth } from '../services/auth';
 import { LogIn, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
 
 export function Login() {
@@ -14,11 +14,7 @@ export function Login() {
         setError(null);
 
         try {
-            const { error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
-
+            const { error } = await auth.login(email, password);
             if (error) throw error;
         } catch (err: any) {
             setError(err.message || 'Error al iniciar sesión');

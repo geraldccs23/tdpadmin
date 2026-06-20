@@ -34,6 +34,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { dbService } from "./services/dbService";
+import { auth } from "./services/auth";
 import { supabase } from "./services/supabase";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
@@ -442,7 +443,11 @@ export default function App() {
   const [rateInput, setRateInput] = useState<string>("");
   const [savingRate, setSavingRate] = useState(false);
 
-  const fetchUserRole = async (userId: string, email: string) => {
+  const fetchUserRole = async (userId: string | null, email: string, presetRole?: string) => {
+    if (presetRole && ['director','supervisor','supervisor_ventas','supervisor_compras','administrador','cajero','vendedor','compras','soporte','delivery','supervisor_almacen','almacenista','admin','cocina'].includes(presetRole)) {
+      setUserRole(presetRole as Role);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from("user_roles")
@@ -486,17 +491,22 @@ export default function App() {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session?.user)
+      if (session?.user?.role) {
+        fetchUserRole(null, "", session.user.role);
+      } else if (session?.user?.id) {
         fetchUserRole(session.user.id, session.user.email || "");
+      }
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session?.user) {
+      if (session?.user?.role) {
+        fetchUserRole(null, "", session.user.role);
+      } else if (session?.user?.id) {
         fetchUserRole(session.user.id, session.user.email || "");
       } else {
         setUserRole(null);
@@ -520,7 +530,7 @@ export default function App() {
   }, [activeView]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await auth.signOut();
   };
 
   const handleToggleSidebar = () => {

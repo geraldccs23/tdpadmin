@@ -15,9 +15,11 @@ CREATE TABLE IF NOT EXISTS public.users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 2. Seed: admin por defecto
-INSERT INTO public.users (email, name, role)
-VALUES ('admin@restaurantdp.local', 'Admin', 'admin')
+-- 2. Seed: admin por defecto (password: change_me)
+INSERT INTO public.users (email, name, role, password_hash)
+VALUES ('admin@restaurantdp.local', 'Admin', 'admin',
+  '$2b$10$cT6VEbY1kUCtjDCMbiT7hOjjmlHnfdsct4MKgpB/HsEKODGtmgWo2'
+)
 ON CONFLICT (email) DO NOTHING;
 
 -- 3. Recrear api_tokens sin FK a auth.users
