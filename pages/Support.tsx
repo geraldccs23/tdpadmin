@@ -72,7 +72,7 @@ export function Support() {
     description: '',
     priority: 'medium' as SupportTicket['priority'],
     category: 'support' as SupportTicket['category'],
-    branch: 'Boleita'
+    branch: ''
   });
   const [ticketImage, setTicketImage] = useState<File | null>(null);
   const ticketFileInputRef = useRef<HTMLInputElement>(null);
@@ -81,6 +81,16 @@ export function Support() {
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [branches, setBranches] = useState<any[]>([]);
+
+  const fetchBranches = async () => {
+    try {
+      const json = await fetch(`${import.meta.env.VITE_API_URL || window.location.origin}/api/settings/branches`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('restaurantdp_auth_token')}` }
+      }).then(r => r.json());
+      if (json.ok) setBranches(json.data?.filter((b: any) => b.is_active) || []);
+    } catch {}
+  };
 
   const fetchUserRole = async () => {
     const { data: { session } } = await auth.getSession();
@@ -114,6 +124,7 @@ export function Support() {
   useEffect(() => {
     fetchUserRole();
     fetchTickets();
+    fetchBranches();
   }, []);
 
   // Polling for messages (replaces Supabase Realtime)
@@ -221,7 +232,7 @@ export function Support() {
         description: '',
         priority: 'medium',
         category: 'support',
-        branch: 'Boleita'
+        branch: ''
       });
       setTicketImage(null);
       fetchTickets();
@@ -481,18 +492,20 @@ export function Support() {
                     <option value="urgent">Urgente</option>
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Sucursal</label>
-                  <select
-                    value={newTicket.branch}
-                    onChange={e => setNewTicket({...newTicket, branch: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#009FE3]/20 focus:border-[#009FE3] outline-none transition-all font-medium appearance-none bg-white"
-                  >
-                    <option value="Boleita">Boleita</option>
-                    <option value="Sabana Grande">Sabana Grande</option>
-                    <option value="Otro">Otro / Global</option>
-                  </select>
-                </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Sucursal</label>
+                    {branches.length === 0 ? (
+                      <p className="text-xs text-amber-600 bg-amber-50 p-3 rounded-xl">Debes crear una sucursal en Configuración antes de crear tickets.</p>
+                    ) : (
+                    <select
+                      value={newTicket.branch}
+                      onChange={e => setNewTicket({...newTicket, branch: e.target.value})}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#009FE3]/20 focus:border-[#009FE3] outline-none transition-all font-medium appearance-none bg-white"
+                    >
+                      {branches.map((b: any) => <option key={b.code} value={b.code}>{b.name}</option>)}
+                    </select>
+                    )}
+                  </div>
               </div>
 
               <div className="space-y-1">

@@ -62,6 +62,7 @@ export const SupportBubble: React.FC = () => {
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [branches, setBranches] = useState<any[]>([]);
 
   const ticketsRef = useRef<SupportTicket[]>([]);
   const selectedTicketRef = useRef<SupportTicket | null>(null);
@@ -79,7 +80,7 @@ export const SupportBubble: React.FC = () => {
     description: '',
     priority: 'medium' as SupportTicket['priority'],
     category: 'support' as SupportTicket['category'],
-    branch: 'Boleita'
+    branch: ''
   });
   const [ticketImage, setTicketImage] = useState<File | null>(null);
   const [isSavingTicket, setIsSavingTicket] = useState(false);
@@ -110,6 +111,7 @@ export const SupportBubble: React.FC = () => {
 
   useEffect(() => {
     fetchSession();
+    fetchBranches();
   }, []);
 
   const fetchSession = async () => {
@@ -193,6 +195,15 @@ export const SupportBubble: React.FC = () => {
     } catch (e) {
       console.error('Error fetching messages:', e);
     }
+  };
+
+  const fetchBranches = async () => {
+    try {
+      const json = await fetch(`${import.meta.env.VITE_API_URL || window.location.origin}/api/settings/branches`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('restaurantdp_auth_token')}` }
+      }).then(r => r.json());
+      if (json.ok) setBranches(json.data?.filter((b: any) => b.is_active) || []);
+    } catch {}
   };
 
   // Polling for real-time updates (replaces Supabase Realtime)
@@ -285,7 +296,7 @@ export const SupportBubble: React.FC = () => {
         description: '',
         priority: 'medium',
         category: 'support',
-        branch: 'Boleita'
+        branch: ''
       });
       setTicketImage(null);
       
@@ -400,15 +411,17 @@ export const SupportBubble: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black uppercase tracking-widest text-gray-400">Sucursal</label>
+                    {branches.length === 0 ? (
+                      <p className="text-[10px] text-amber-600 bg-amber-50 p-2 rounded-xl">Debes crear una sucursal en Configuración.</p>
+                    ) : (
                     <select
                       value={newTicket.branch}
                       onChange={e => setNewTicket({...newTicket, branch: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#009FE3]/15 focus:border-[#009FE3] outline-none text-xs font-medium bg-white"
                     >
-                      <option value="Boleita">Boleita</option>
-                      <option value="Sabana Grande">Sabana Grande</option>
-                      <option value="Otro">Otro / Global</option>
+                      {branches.map((b: any) => <option key={b.code} value={b.code}>{b.name}</option>)}
                     </select>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9px] font-black uppercase tracking-widest text-gray-400">Prioridad</label>

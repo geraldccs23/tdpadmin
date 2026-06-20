@@ -69,6 +69,7 @@ SELECT
   t.assigned_to,
   COALESCE(t.assigned_email, u_assigned.email) AS assigned_email,
   t.branch,
+  cb.name AS branch_name,
   t.image_url,
   t.external_ticket_id,
   t.sync_status,
@@ -77,7 +78,8 @@ SELECT
   COALESCE(t.user_email, u_creator.email) AS creator_email
 FROM public.support_tickets t
 LEFT JOIN public.users u_creator ON t.user_id = u_creator.id
-LEFT JOIN public.users u_assigned ON t.assigned_to = u_assigned.id;
+LEFT JOIN public.users u_assigned ON t.assigned_to = u_assigned.id
+LEFT JOIN public.company_branches cb ON t.branch = cb.code;
 
 -- =============================================================================
 -- Trigger: updated_at
