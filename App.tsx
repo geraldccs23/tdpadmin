@@ -747,6 +747,19 @@ export default function App() {
             userPermissions={permissions}
           />
 
+          <NavItem
+            icon={MessageSquare}
+            label="Soporte"
+            view="support"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["admin", "manager", "cashier", "soporte", "cocina", "waiter"]}
+            userRole={userRole}
+            perm="support.view"
+            userPermissions={permissions}
+          />
+
           {userRole === "admin" && (
             <>
             <div className="pb-2 mb-2">

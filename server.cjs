@@ -998,6 +998,128 @@ app.post("/api/agent/mercatech/update", requireMercatechToken, async (req, res) 
 });
 
 // =============================================================================
+// Support Module
+// =============================================================================
+const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
+const fs = require("fs");
+const path = require("path");
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+function requireSupportAuth(req, res, next) {
+  requireJwt(req, res, () => {
+    req.canManage = req.user?.role === "admin" || req.user?.role === "manager" || req.user?.role === "soporte";
+    next();
+  });
+}
+
+// GET /api/support/tickets
+app.get("/api/support/tickets", requireSupportAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const canManage = req.canManage;
+    let sql, params;
+    if (canManage) {
+      sql = "SELECT * FROM public.v_support_tickets ORDER BY created_at DESC";
+      params = [];
+    } else {
+      sql = "SELECT * FROM public.v_support_tickets WHERE user_id = $1 ORDER BY created_at DESC";
+      params = [userId];
+    }
+    const { rows } = await pool.query(sql, params);
+    res.json({ ok: true, tickets: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/support/tickets
+app.post("/api/support/tickets", requireSupportAuth, async (req, res) => {
+  try {
+    const { title, description, priority, category, branch, image_url } = req.body || {};
+    if (!title || !description) return res.status(400).json({ ok: false, error: "title and description required" });
+    const { rows } = await pool.query(
+      `INSERT INTO public.support_tickets (title, description, priority, category, branch, user_id, user_email, image_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [title, description, priority || 'medium', category || 'support', branch || null, req.user.id, req.user.email, image_url || null]
+    );
+    res.json({ ok: true, ticket: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/support/tickets/:id/messages
+app.get("/api/support/tickets/:id/messages", requireSupportAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT * FROM public.support_messages WHERE ticket_id = $1 ORDER BY created_at ASC",
+      [req.params.id]
+    );
+    res.json({ ok: true, messages: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/support/tickets/:id/messages
+app.post("/api/support/tickets/:id/messages", requireSupportAuth, async (req, res) => {
+  try {
+    const { message, image_url } = req.body || {};
+    if (!message) return res.status(400).json({ ok: false, error: "message required" });
+    const { rows } = await pool.query(
+      `INSERT INTO public.support_messages (ticket_id, sender_id, sender_email, message, image_url)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [req.params.id, req.user.id, req.user.email, message, image_url || null]
+    );
+    res.json({ ok: true, message: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/support/tickets/:id
+app.patch("/api/support/tickets/:id", requireSupportAuth, async (req, res) => {
+  try {
+    const { status, priority, assigned_to } = req.body || {};
+    const sets = [];
+    const params = [];
+    let idx = 0;
+    if (status !== undefined) { idx++; sets.push(`status = $${idx}`); params.push(status); }
+    if (priority !== undefined) { idx++; sets.push(`priority = $${idx}`); params.push(priority); }
+    if (assigned_to !== undefined) { idx++; sets.push(`assigned_to = $${idx}`); params.push(assigned_to); }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields to update" });
+    idx++; params.push(req.params.id);
+    const { rows } = await pool.query(
+      `UPDATE public.support_tickets SET ${sets.join(", ")} WHERE id = $${idx} RETURNING *`,
+      params
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "ticket not found" });
+    res.json({ ok: true, ticket: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/support/upload — file upload (stores locally, returns URL)
+app.post("/api/support/upload", requireSupportAuth, async (req, res) => {
+  try {
+    const { file_data, file_name } = req.body || {};
+    if (!file_data) return res.status(400).json({ ok: false, error: "file_data required (base64)" });
+    const ext = (file_name || "file.png").split(".").pop();
+    const storedName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const buffer = Buffer.from(file_data, "base64");
+    fs.writeFileSync(path.join(UPLOAD_DIR, storedName), buffer);
+    res.json({ ok: true, url: `/uploads/${storedName}` });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// Serve uploaded files
+app.use("/uploads", express.static(UPLOAD_DIR));
+
+// =============================================================================
 // Generic Data Proxy (replaces Supabase .from() calls)
 // =============================================================================
 

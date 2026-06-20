@@ -18,9 +18,9 @@ import {
   Paperclip,
   ImageIcon
 } from 'lucide-react';
-import { dbService } from '../services/dbService';
+import { supportApi } from '../services/supportApi';
+import { auth } from '../services/auth';
 import { SupportTicket } from '../types';
-import { supabase } from '../services/supabase';
 
 interface SupportMessage {
     id: number;
@@ -83,19 +83,18 @@ export function Support() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const fetchUserRole = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await auth.getSession();
     if (session?.user) {
         setCurrentUserId(session.user.id);
-        const { data } = await supabase.from('user_roles').select('role').eq('user_id', session.user.id).single();
-        if (data) setUserRole(data.role);
+        setUserRole(session.user.role || null);
     }
   };
 
   const fetchTickets = async () => {
     try {
       setLoading(true);
-      const data = await dbService.getSupportTickets();
-      setTickets(data);
+      const data = await supportApi.getTickets();
+      setTickets(data || []);
     } catch (error) {
       console.error('Error fetching tickets:', error);
     } finally {
@@ -104,13 +103,12 @@ export function Support() {
   };
 
   const fetchMessages = async (ticketId: string) => {
-      const { data, error } = await supabase
-        .from('support_messages')
-        .select('*')
-        .eq('ticket_id', ticketId)
-        .order('created_at', { ascending: true });
-      
-      if (!error) setMessages(data || []);
+      try {
+        const data = await supportApi.getMessages(ticketId);
+        setMessages(data || []);
+      } catch (e) {
+        console.error('Error fetching messages:', e);
+      }
   };
 
   useEffect(() => {
@@ -118,25 +116,13 @@ export function Support() {
     fetchTickets();
   }, []);
 
-  // Real-time subscription for messages
+  // Polling for messages (replaces Supabase Realtime)
   useEffect(() => {
       if (!selectedTicket) return;
-
-      const channel = supabase
-        .channel(`chat:${selectedTicket.id}`)
-        .on('postgres_changes', { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'support_messages',
-            filter: `ticket_id=eq.${selectedTicket.id}`
-        }, (payload) => {
-            setMessages(prev => [...prev, payload.new as SupportMessage]);
-        })
-        .subscribe();
-
-      return () => {
-          supabase.removeChannel(channel);
-      };
+      const interval = setInterval(() => {
+        fetchMessages(selectedTicket.id);
+      }, 10000);
+      return () => clearInterval(interval);
   }, [selectedTicket]);
 
   useEffect(() => {
@@ -145,7 +131,7 @@ export function Support() {
 
   const handleUpdateStatus = async (id: string, status: SupportTicket['status']) => {
     try {
-      await dbService.updateSupportTicket(id, { status });
+      await supportApi.updateTicket(id, { status });
       if (selectedTicket?.id === id) {
         setSelectedTicket({ ...selectedTicket, status });
       }
@@ -162,22 +148,21 @@ export function Support() {
     setIsDetailModalOpen(true);
   };
 
-  const uploadImage = async (file: File) => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('ImagenesSoporte')
-      .upload(filePath, file);
-
-    if (uploadError) throw uploadError;
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('ImagenesSoporte')
-      .getPublicUrl(filePath);
-
-    return publicUrl;
+  const uploadImage = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64 = (reader.result as string).split(',')[1];
+          const url = await supportApi.uploadImage(base64, file.name);
+          resolve(url);
+        } catch (e) {
+          reject(e);
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -186,7 +171,7 @@ export function Support() {
 
       setSendingMessage(true);
       try {
-          const { data: { session } } = await supabase.auth.getSession();
+          const { data: { session } } = await auth.getSession();
           if (!session) {
               alert('Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.');
               return;
@@ -197,22 +182,15 @@ export function Support() {
               imageUrl = await uploadImage(chatImage);
           }
 
-          const { error } = await supabase.from('support_messages').insert([{
-              ticket_id: selectedTicket.id,
-              sender_id: currentUserId,
-              sender_email: session.user.email,
+          await supportApi.sendMessage(selectedTicket.id, {
               message: JSON.stringify({
                   text: newMessage.trim(),
                   image_url: imageUrl || null
-              })
-          }]);
-
-          if (error) {
-              console.error('Error details:', error);
-              throw error;
-          }
+              }),
+          });
           setNewMessage('');
           setChatImage(null);
+          fetchMessages(selectedTicket.id);
       } catch (error: any) {
           console.error('Error sending message:', error);
           alert(`No se pudo enviar el mensaje: ${error.message || 'Error desconocido'}`);
@@ -233,7 +211,7 @@ export function Support() {
         imageUrl = await uploadImage(ticketImage);
       }
 
-      await dbService.createSupportTicket({
+      await supportApi.createTicket({
         ...newTicket,
         image_url: imageUrl || undefined
       });
@@ -282,7 +260,7 @@ export function Support() {
     return matchesSearch && matchesStatus;
   });
 
-  const canManage = userRole === 'soporte' || userRole === 'director' || userRole === 'supervisor';
+  const canManage = userRole === 'admin' || userRole === 'manager' || userRole === 'soporte';
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -290,7 +268,7 @@ export function Support() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div>
           <h2 className="text-2xl font-black text-gray-800 flex items-center gap-2">
-            <MessageSquare className="text-[#D40000]" size={28} />
+            <MessageSquare className="text-[#009FE3]" size={28} />
             Centro de Soporte & Chat
           </h2>
           <p className="text-gray-500 text-sm font-medium mt-1">
@@ -299,7 +277,7 @@ export function Support() {
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 bg-[#D40000] hover:bg-[#B30000] text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-red-500/20 active:scale-95"
+          className="flex items-center justify-center gap-2 bg-[#009FE3] hover:bg-[#0088c4] text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-[#009FE3]/20 active:scale-95"
         >
           <Plus size={20} />
           Nuevo requerimiento
@@ -329,13 +307,13 @@ export function Support() {
       {/* Filters & Search */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1 group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#D40000] transition-colors" size={20} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#009FE3] transition-colors" size={20} />
           <input
             type="text"
             placeholder="Buscar por título o descripción..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#D40000]/20 focus:border-[#D40000] outline-none transition-all font-medium"
+            className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#009FE3]/20 focus:border-[#009FE3] outline-none transition-all font-medium"
           />
         </div>
         <div className="flex gap-2 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
@@ -358,7 +336,7 @@ export function Support() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <Loader2 className="animate-spin text-[#D40000]" size={40} />
+            <Loader2 className="animate-spin text-[#009FE3]" size={40} />
             <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">Cargando requerimientos...</p>
           </div>
         ) : filteredTickets.length === 0 ? (
@@ -390,7 +368,7 @@ export function Support() {
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                         <span className="text-[10px] font-mono text-gray-400 uppercase">#{ticket.id.substring(0, 8)}</span>
-                        <span className="font-bold text-gray-800 text-sm group-hover:text-[#D40000] transition-colors">{ticket.title}</span>
+                        <span className="font-bold text-gray-800 text-sm group-hover:text-[#009FE3] transition-colors">{ticket.title}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -465,7 +443,7 @@ export function Support() {
           <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50">
               <h3 className="text-xl font-black text-gray-800 flex items-center gap-2">
-                <Send className="text-[#D40000]" size={24} />
+                <Send className="text-[#009FE3]" size={24} />
                 Nuevo Requerimiento
               </h3>
               <button 
@@ -485,7 +463,7 @@ export function Support() {
                   value={newTicket.title}
                   onChange={e => setNewTicket({...newTicket, title: e.target.value})}
                   placeholder="Ej: Error al procesar pago en Bancamiga"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#D40000]/20 focus:border-[#D40000] outline-none transition-all font-medium"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#009FE3]/20 focus:border-[#009FE3] outline-none transition-all font-medium"
                 />
               </div>
 
@@ -495,7 +473,7 @@ export function Support() {
                   <select
                     value={newTicket.priority}
                     onChange={e => setNewTicket({...newTicket, priority: e.target.value as any})}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#D40000]/20 focus:border-[#D40000] outline-none transition-all font-medium appearance-none bg-white"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#009FE3]/20 focus:border-[#009FE3] outline-none transition-all font-medium appearance-none bg-white"
                   >
                     <option value="low">Baja</option>
                     <option value="medium">Media</option>
@@ -508,7 +486,7 @@ export function Support() {
                   <select
                     value={newTicket.branch}
                     onChange={e => setNewTicket({...newTicket, branch: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#D40000]/20 focus:border-[#D40000] outline-none transition-all font-medium appearance-none bg-white"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#009FE3]/20 focus:border-[#009FE3] outline-none transition-all font-medium appearance-none bg-white"
                   >
                     <option value="Boleita">Boleita</option>
                     <option value="Sabana Grande">Sabana Grande</option>
@@ -544,7 +522,7 @@ export function Support() {
                   value={newTicket.description}
                   onChange={e => setNewTicket({...newTicket, description: e.target.value})}
                   placeholder="Describe detalladamente el problema o solicitud..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#D40000]/20 focus:border-[#D40000] outline-none transition-all font-medium resize-none"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#009FE3]/20 focus:border-[#009FE3] outline-none transition-all font-medium resize-none"
                 />
               </div>
 
@@ -591,7 +569,7 @@ export function Support() {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="flex-[2] bg-[#D40000] hover:bg-[#B30000] text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-[2] bg-[#009FE3] hover:bg-[#0088c4] text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-[#009FE3]/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isSaving ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
                   Enviar Requerimiento
@@ -651,13 +629,13 @@ export function Support() {
                         <div>
                             <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Sucursal</label>
                             <div className="flex items-center gap-2 text-xs font-bold text-gray-700">
-                                <Building2 size={14} className="text-[#D40000]" /> {selectedTicket.branch}
+                                <Building2 size={14} className="text-[#009FE3]" /> {selectedTicket.branch}
                             </div>
                         </div>
                         <div>
                             <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Creado por</label>
                             <div className="flex items-center gap-2 text-xs font-bold text-gray-700">
-                                <User size={14} className="text-[#D40000]" /> {selectedTicket.creator_email?.split('@')[0]}
+                                <User size={14} className="text-[#009FE3]" /> {selectedTicket.creator_email?.split('@')[0]}
                             </div>
                         </div>
                     </div>
@@ -754,12 +732,12 @@ export function Support() {
                             value={newMessage}
                             onChange={e => setNewMessage(e.target.value)}
                             placeholder="Escribe un mensaje..."
-                            className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#D40000]/20 focus:border-[#D40000] outline-none transition-all font-medium text-sm"
+                            className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#009FE3]/20 focus:border-[#009FE3] outline-none transition-all font-medium text-sm"
                         />
                         <button 
                             type="submit"
                             disabled={sendingMessage || (!newMessage.trim() && !chatImage)}
-                            className="p-3 bg-[#D40000] text-white rounded-xl shadow-lg shadow-red-500/20 hover:bg-[#B30000] transition-all disabled:opacity-50"
+                            className="p-3 bg-[#009FE3] text-white rounded-xl shadow-lg shadow-[#009FE3]/20 hover:bg-[#0088c4] transition-all disabled:opacity-50"
                         >
                             {sendingMessage ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
                         </button>
