@@ -1,44 +1,42 @@
 -- ============================================================================
--- restaurantdp — PostgreSQL 17 Init Script
+-- restaurantdp — PostgreSQL 17 Init Script (standalone)
 -- Ejecutar en DB vacía: psql -h postgres -U tdp_admin -d tdp_main -f init.sql
--- Orden: extensiones → compat auth → schema-final → migrations
 -- ============================================================================
 
 -- 1. Extensiones
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- 2. Capa de compatibilidad para schema-final.sql (originario de Supabase)
---    Provee auth.users, auth.uid(), auth.jwt() para que no fallen las FK ni RLS
-CREATE SCHEMA IF NOT EXISTS auth;
-
-CREATE TABLE IF NOT EXISTS auth.users (
-  id UUID PRIMARY KEY,
-  email TEXT,
-  raw_user_meta_data JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT now()
+-- 2. Usuarios + auth
+CREATE TABLE IF NOT EXISTS public.users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL UNIQUE,
+  name TEXT,
+  role TEXT NOT NULL DEFAULT 'cajero' CHECK (role IN ('director','supervisor','supervisor_ventas','supervisor_compras','administrador','cajero','vendedor','compras','soporte','delivery','supervisor_almacen','almacenista','admin','cocina')),
+  branch TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  password_hash TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-INSERT INTO auth.users (id, email) VALUES
-  ('00000000-0000-0000-0000-000000000001', 'admin@restaurantdp.local')
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.users (email, name, role, password_hash)
+VALUES ('admin@restaurantdp.local', 'Admin', 'admin', '$2b$10$cT6VEbY1kUCtjDCMbiT7hOjjmlHnfdsct4MKgpB/HsEKODGtmgWo2')
+ON CONFLICT (email) DO NOTHING;
 
-CREATE OR REPLACE FUNCTION auth.uid() RETURNS UUID
-  LANGUAGE SQL STABLE AS $$ SELECT '00000000-0000-0000-0000-000000000001'::uuid; $$;
+-- 3. API tokens
+CREATE TABLE IF NOT EXISTS public.api_tokens (
+  id BIGINT GENERATED ALWAYS AS IDENTITY NOT NULL,
+  name TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ,
+  last_used_at TIMESTAMPTZ,
+  last_ip TEXT,
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_by TEXT,
+  CONSTRAINT api_tokens_pkey PRIMARY KEY (id)
+);
 
-CREATE OR REPLACE FUNCTION auth.jwt() RETURNS JSONB
-  LANGUAGE SQL STABLE AS $$ SELECT jsonb_build_object('role', 'authenticated', 'email', 'admin@restaurantdp.local'); $$;
-
--- 3. Schema completo (tablas existentes del ERP)
-\i schema-final.sql
-
--- 4. Migraciones incrementales pre-restaurant
-\i migration-006-transfer-drafts.sql
-\i migration-007-physical-inventory.sql
-\i migration-008-inventory-dashboard.sql
-\i migration-009-costo-productos.sql
-
--- 5. Migración: remover Supabase auth, crear tabla users propia
-\i migration-011-remove-supabase.sql
-
--- 6. Migración: esquema de restaurante
-\i migration-010-restaurant-schema.sql
+-- 4. Esquema de restaurante
+-- (ejecutar desde la raíz del proyecto: psql -h postgres -U tdp_admin -d tdp_main -f sql/init.sql)
+\i sql/migration-010-restaurant-schema.sql
