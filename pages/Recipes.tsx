@@ -31,9 +31,11 @@ function RecipeDetail({ recipe, onClose, onUpdated }: { recipe: any; onClose: ()
     setSaving(true);
     const json = await api(`/api/restaurant/recipes/${recipe.id}/items`, { method: 'POST', body: JSON.stringify(addForm) });
     if (json.ok) {
-      const { rows } = await api(`/api/restaurant/recipes/${recipe.id}`).then(j => j.ok ? j.data.items || [] : []);
-      setItems(rows || []);
+      const freshItems = await api(`/api/restaurant/recipes/${recipe.id}`).then(j => j.ok ? j.data.items || [] : []);
+      setItems(freshItems);
       setAddForm({ ingredient_id: '', quantity: 1, unit: 'unidad' });
+    } else {
+      alert(json.error || 'Error al agregar ingrediente');
     }
     setSaving(false);
   };
@@ -133,6 +135,9 @@ export function Recipes() {
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
   const [form, setForm] = useState({ code: '', name: '', category: '', description: '', preparation_time_minutes: '', portions: 1, instructions: '' });
+  const [recipeItems, setRecipeItems] = useState<any[]>([]);
+  const [availIngredients, setAvailIngredients] = useState<any[]>([]);
+  const [newIngredient, setNewIngredient] = useState({ ingredient_id: '', quantity: 1 });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [detailRecipe, setDetailRecipe] = useState<any>(null);
@@ -147,14 +152,38 @@ export function Recipes() {
 
   useEffect(() => { fetchItems(); }, [search, filter]);
 
-  const openNew = () => { setEditItem(null); setForm({ code: '', name: '', category: '', description: '', preparation_time_minutes: '', portions: 1, instructions: '' }); setShowForm(true); setError(''); };
-  const openEdit = (item: any) => { setEditItem(item); setForm({ code: item.code || '', name: item.name, category: item.category || '', description: item.description || '', preparation_time_minutes: item.preparation_time_minutes || '', portions: item.portions || 1, instructions: item.instructions || '' }); setShowForm(true); setError(''); };
+  const loadIngredients = async () => {
+    const json = await api('/api/restaurant/ingredients?filter=active');
+    if (json.ok) setAvailIngredients(json.data || []);
+  };
+
+  const openNew = () => {
+    setEditItem(null);
+    setForm({ code: '', name: '', category: '', description: '', preparation_time_minutes: '', portions: 1, instructions: '' });
+    setRecipeItems([]);
+    setShowForm(true); setError('');
+    loadIngredients();
+  };
+
+  const openEdit = async (item: any) => {
+    setEditItem(item);
+    setForm({ code: item.code || '', name: item.name, category: item.category || '', description: item.description || '', preparation_time_minutes: item.preparation_time_minutes || '', portions: item.portions || 1, instructions: item.instructions || '' });
+    const json = await api(`/api/restaurant/recipes/${item.id}`);
+    if (json.ok) setRecipeItems(json.data?.items?.map((i: any) => ({ ingredient_id: i.ingredient_id, ingredient_name: i.ingredient_name, quantity: i.quantity, unit: i.unit, cost_snapshot: i.cost_snapshot || i.ingredient_cost })) || []);
+    setShowForm(true); setError('');
+    loadIngredients();
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { setError('Nombre requerido'); return; }
     setSaving(true); setError('');
-    const body = { ...form, preparation_time_minutes: form.preparation_time_minutes ? Number(form.preparation_time_minutes) : null, portions: Number(form.portions) };
+    const body = {
+      ...form,
+      preparation_time_minutes: form.preparation_time_minutes ? Number(form.preparation_time_minutes) : null,
+      portions: Number(form.portions),
+      items: recipeItems.map(i => ({ ingredient_id: i.ingredient_id, quantity: i.quantity, unit: i.unit || 'unidad' })),
+    };
     const json = editItem
       ? await api(`/api/restaurant/recipes/${editItem.id}`, { method: 'PATCH', body: JSON.stringify(body) })
       : await api('/api/restaurant/recipes', { method: 'POST', body: JSON.stringify(body) });
@@ -162,6 +191,26 @@ export function Recipes() {
     else setError(json.error || 'Error');
     setSaving(false);
   };
+
+  const addIngredientToForm = () => {
+    if (!newIngredient.ingredient_id) return;
+    const ing = availIngredients.find(i => i.id === newIngredient.ingredient_id);
+    if (!ing) return;
+    setRecipeItems(prev => [...prev, {
+      ingredient_id: ing.id,
+      ingredient_name: ing.name,
+      quantity: Number(newIngredient.quantity) || 1,
+      unit: ing.unit || 'unidad',
+      cost_snapshot: Number(ing.cost) || 0,
+    }]);
+    setNewIngredient({ ingredient_id: '', quantity: 1 });
+  };
+
+  const removeIngredientFromForm = (idx: number) => {
+    setRecipeItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const formCost = recipeItems.reduce((sum, ri) => sum + Number(ri.quantity) * Number(ri.cost_snapshot || 0), 0);
 
   const toggleActive = async (item: any) => {
     const json = await api(`/api/restaurant/recipes/${item.id}`, { method: 'DELETE' });
@@ -224,6 +273,42 @@ export function Recipes() {
               </div>
               <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Instrucciones</label>
                 <textarea value={form.instructions} onChange={e => setForm(f => ({ ...f, instructions: e.target.value }))} rows={3} className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]" /></div>
+
+              <div className="border-t border-gray-100 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold text-gray-700 text-sm">Ingredientes ({recipeItems.length})</h4>
+                  <span className="text-sm text-gray-500 font-mono">Costo parcial: ${formCost.toFixed(2)}</span>
+                </div>
+                <div className="flex items-end gap-2 mb-3">
+                  <div className="flex-1">
+                    <select value={newIngredient.ingredient_id} onChange={e => setNewIngredient(f => ({ ...f, ingredient_id: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]">
+                      <option value="">Seleccionar...</option>
+                      {availIngredients.map(i => <option key={i.id} value={i.id}>{i.name} (${Number(i.cost || 0).toFixed(2)}/{i.unit})</option>)}
+                    </select>
+                  </div>
+                  <div className="w-24">
+                    <input type="number" step="0.01" value={newIngredient.quantity} onChange={e => setNewIngredient(f => ({ ...f, quantity: Number(e.target.value) }))}
+                      className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]" placeholder="Cant." />
+                  </div>
+                  <button type="button" onClick={addIngredientToForm} className="bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-200 text-sm font-semibold whitespace-nowrap">+ Agregar</button>
+                </div>
+                {recipeItems.length > 0 && (
+                  <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 max-h-40 overflow-y-auto">
+                    {recipeItems.map((ri, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 text-sm">
+                        <span className="font-medium text-gray-800">{ri.ingredient_name}</span>
+                        <div className="flex items-center gap-4">
+                          <span className="font-mono text-gray-600">{Number(ri.quantity).toFixed(2)} {ri.unit}</span>
+                          <span className="font-mono text-gray-500">${(Number(ri.quantity) * Number(ri.cost_snapshot || 0)).toFixed(2)}</span>
+                          <button type="button" onClick={() => removeIngredientFromForm(idx)} className="text-gray-400 hover:text-red-500 text-lg leading-none">&times;</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <button type="submit" disabled={saving} className="w-full bg-[#009FE3] text-white font-semibold py-2.5 rounded-xl hover:bg-[#0088c4] text-sm flex items-center justify-center gap-2 disabled:opacity-50">
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Guardar
               </button>
