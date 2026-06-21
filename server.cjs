@@ -1479,6 +1479,212 @@ app.delete("/api/restaurant/menu/items/:id", requireJwt, async (req, res) => {
 });
 
 // =============================================================================
+// Inventory: Movements CRUD
+// =============================================================================
+
+const ENTRY_TYPES = ['compra', 'ajuste_positivo', 'transferencia_entrada', 'devolucion'];
+const EXIT_TYPES = ['venta', 'ajuste_negativo', 'transferencia_salida', 'merma', 'vencimiento'];
+
+function normalizeQuantity(movementType, qty) {
+  const abs = Math.abs(Number(qty) || 0);
+  if (ENTRY_TYPES.includes(movementType)) return abs;
+  return -abs;
+}
+
+// GET /api/inventory/movements
+app.get("/api/inventory/movements", requireJwt, async (req, res) => {
+  try {
+    let sql = `SELECT m.*,
+      COALESCE(i.name, ip.name) AS item_name
+      FROM public.inventory_movements m
+      LEFT JOIN public.restaurant_ingredients i ON m.item_type = 'ingredient' AND m.item_id = i.id
+      LEFT JOIN public.restaurant_inventory_products ip ON m.item_type = 'inventory_product' AND m.item_id = ip.id
+      WHERE 1=1`;
+    const params = [];
+    for (const key of ['item_type', 'item_id', 'movement_type', 'warehouse_id']) {
+      if (req.query[key]) { params.push(req.query[key]); sql += ` AND m.${key} = $${params.length}`; }
+    }
+    if (req.query.from) { params.push(req.query.from); sql += ` AND m.created_at >= $${params.length}`; }
+    if (req.query.to) { params.push(req.query.to); sql += ` AND m.created_at <= $${params.length}`; }
+    sql += " ORDER BY m.created_at DESC LIMIT 500";
+    const { rows } = await pool.query(sql, params);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/inventory/movements
+app.post("/api/inventory/movements", requireJwt, async (req, res) => {
+  const { item_type, item_id, movement_type, quantity, unit_cost, warehouse_id, reference_type, reference_id, notes, allow_negative } = req.body || {};
+  if (!item_type || !item_id || !movement_type) {
+    return res.status(400).json({ ok: false, error: "item_type, item_id, movement_type required" });
+  }
+  if (!['ingredient', 'inventory_product'].includes(item_type)) {
+    return res.status(400).json({ ok: false, error: "invalid item_type" });
+  }
+  if (![...ENTRY_TYPES, ...EXIT_TYPES].includes(movement_type)) {
+    return res.status(400).json({ ok: false, error: "invalid movement_type" });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Verify item exists and get current cost + stock
+    let table, stockCol, costCol, nameCol;
+    if (item_type === 'ingredient') {
+      table = 'public.restaurant_ingredients';
+      stockCol = 'stock';
+      costCol = 'cost';
+      nameCol = 'name';
+    } else {
+      table = 'public.restaurant_inventory_products';
+      stockCol = 'current_stock';
+      costCol = 'cost';
+      nameCol = 'name';
+    }
+
+    const { rows: itemRows } = await client.query(
+      `SELECT ${stockCol} AS current_stock, ${costCol} AS cost, ${nameCol} AS name FROM ${table} WHERE id = $1`,
+      [item_id]
+    );
+    if (itemRows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ ok: false, error: "item not found" });
+    }
+    const item = itemRows[0];
+
+    // Normalize quantity sign
+    const signedQty = normalizeQuantity(movement_type, quantity);
+    const absQty = Math.abs(signedQty);
+
+    // Check negative stock
+    const newStock = Number(item.current_stock) + signedQty;
+    if (newStock < 0 && !allow_negative) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        ok: false, error: `stock insuficiente: tiene ${Number(item.current_stock).toFixed(2)}, necesita ${absQty.toFixed(2)}`
+      });
+    }
+
+    // Determine unit cost
+    const finalCost = unit_cost !== undefined && unit_cost !== null && unit_cost !== ''
+      ? Number(unit_cost) : (Number(item.cost) || 0);
+    const totalCost = absQty * finalCost;
+
+    // Insert movement
+    const { rows: movRows } = await client.query(
+      `INSERT INTO public.inventory_movements (item_type, item_id, movement_type, quantity, unit_cost, total_cost, reference_type, reference_id, warehouse_id, notes, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [item_type, item_id, movement_type, signedQty, finalCost, totalCost, reference_type || null, reference_id || null, warehouse_id || null, notes || null, req.user.id]
+    );
+
+    // Update stock
+    await client.query(
+      `UPDATE ${table} SET ${stockCol} = ${stockCol} + $1 WHERE id = $2`,
+      [signedQty, item_id]
+    );
+
+    await client.query("COMMIT");
+    res.json({ ok: true, data: movRows[0] });
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  } finally {
+    client.release();
+  }
+});
+
+// GET /api/inventory/movements/:id
+app.get("/api/inventory/movements/:id", requireJwt, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT m.*,
+        COALESCE(i.name, ip.name) AS item_name
+       FROM public.inventory_movements m
+       LEFT JOIN public.restaurant_ingredients i ON m.item_type = 'ingredient' AND m.item_id = i.id
+       LEFT JOIN public.restaurant_inventory_products ip ON m.item_type = 'inventory_product' AND m.item_id = ip.id
+       WHERE m.id = $1`, [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// =============================================================================
+// Purchases: Suppliers CRUD
+// =============================================================================
+
+app.get("/api/purchases/suppliers", requireJwt, async (req, res) => {
+  try {
+    const search = req.query.search || '';
+    const filter = req.query.filter || 'all';
+    let sql = "SELECT * FROM public.purchase_suppliers WHERE 1=1";
+    const params = [];
+    if (search) {
+      sql += " AND (name ILIKE $" + (params.length + 1) + " OR code ILIKE $" + (params.length + 1) + " OR rif ILIKE $" + (params.length + 1) + ")";
+      params.push(`%${search}%`);
+    }
+    if (filter === 'active') sql += " AND is_active = true";
+    else if (filter === 'inactive') sql += " AND is_active = false";
+    sql += " ORDER BY name ASC";
+    const { rows } = await pool.query(sql, params);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+app.post("/api/purchases/suppliers", requireJwt, async (req, res) => {
+  try {
+    const { code, name, contact_person, phone, email, rif, address, payment_terms, lead_time_days, notes } = req.body || {};
+    if (!name) return res.status(400).json({ ok: false, error: "name required" });
+    const { rows } = await pool.query(
+      `INSERT INTO public.purchase_suppliers (code, name, contact_person, phone, email, rif, address, payment_terms, lead_time_days, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [code || null, name, contact_person || '', phone || '', email || '', rif || null, address || '', payment_terms || '', lead_time_days || null, notes || '']
+    );
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    const msg = e?.constraint === 'purchase_suppliers_code_key' ? 'code already exists' : String(e?.message || e);
+    res.status(400).json({ ok: false, error: msg });
+  }
+});
+
+app.patch("/api/purchases/suppliers/:id", requireJwt, async (req, res) => {
+  try {
+    const sets = []; const params = []; let idx = 0;
+    for (const key of ['code','name','contact_person','phone','email','rif','address','payment_terms','lead_time_days','notes','is_active']) {
+      if (req.body[key] !== undefined) { idx++; sets.push(`${key} = $${idx}`); params.push(req.body[key]); }
+    }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields" });
+    idx++; params.push(req.params.id);
+    const { rows } = await pool.query(
+      `UPDATE public.purchase_suppliers SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`, params
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+app.delete("/api/purchases/suppliers/:id", requireJwt, async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      "UPDATE public.purchase_suppliers SET is_active = false WHERE id = $1 AND is_active = true", [req.params.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// =============================================================================
 // Support Module
 // =============================================================================
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";

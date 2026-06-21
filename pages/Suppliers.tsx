@@ -1,361 +1,196 @@
-import React, { useEffect, useState } from 'react';
-import { dbService } from '../services/dbService';
-import { supabase } from '../services/supabase';
-import { Supplier } from '../types';
-import { Truck, Star, Clock, CheckCircle, RefreshCw, Filter, Calendar, Info, XCircle, User, Phone, Mail, MapPin, FileText, PlusCircle, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Search, Pencil, X, Save, Loader2, Building2 } from 'lucide-react';
+
+const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
+function getToken() { return localStorage.getItem('restaurantdp_auth_token'); }
+async function api(path: string, opts?: RequestInit) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}${path}`, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts?.headers },
+  });
+  return res.json();
+}
 
 export function Suppliers() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterUrgent, setFilterUrgent] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [showForm, setShowForm] = useState(false);
+  const [editItem, setEditItem] = useState<any>(null);
+  const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
-  const [newSupplier, setNewSupplier] = useState({
-    supplier_name: '',
-    rif: '',
-    phone: '',
-    email: '',
-    address: '',
-    contact_name: ''
-  });
+  const [error, setError] = useState('');
 
-  const handleCreateSupplier = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newSupplier.supplier_name.trim()) return;
-
-    setSaving(true);
-    try {
-      const { data: lastSups, error: fetchErr } = await supabase
-        .from('suppliers')
-        .select('supplier_code')
-        .like('supplier_code', 'SUP%')
-        .order('supplier_code', { ascending: false })
-        .limit(1);
-
-      if (fetchErr) throw fetchErr;
-
-      let nextCode = 'SUP001';
-      if (lastSups && lastSups.length > 0) {
-        const match = lastSups[0].supplier_code.match(/SUP(\d+)/i);
-        if (match) {
-          const num = parseInt(match[1], 10) + 1;
-          nextCode = `SUP${String(num).padStart(3, '0')}`;
-        }
-      }
-
-      const { error: insertErr } = await supabase
-        .from('suppliers')
-        .insert([{
-          supplier_code: nextCode,
-          supplier_name: newSupplier.supplier_name.trim().toUpperCase(),
-          rif: newSupplier.rif.trim().toUpperCase() || null,
-          phone: newSupplier.phone.trim() || null,
-          email: newSupplier.email.trim() || null,
-          address: newSupplier.address.trim().toUpperCase() || null,
-          contact_name: newSupplier.contact_name.trim() || null,
-          is_active: true
-        }]);
-
-      if (insertErr) throw insertErr;
-
-      const data = await dbService.getFordmacRanking();
-      setSuppliers(data);
-      setIsModalOpen(false);
-      
-      setNewSupplier({
-        supplier_name: '',
-        rif: '',
-        phone: '',
-        email: '',
-        address: '',
-        contact_name: ''
-      });
-    } catch (error) {
-      console.error('Error creating supplier:', error);
-      alert('Error al crear el proveedor: ' + (error as any).message);
-    } finally {
-      setSaving(false);
-    }
+  const fetchItems = async () => {
+    setLoading(true);
+    const params = new URLSearchParams({ search, filter });
+    const json = await api(`/api/purchases/suppliers?${params}`);
+    if (json.ok) setItems(json.data || []);
+    setLoading(false);
   };
 
-  useEffect(() => {
-    async function loadRanking() {
-      try {
-        const data = await dbService.getFordmacRanking();
-        setSuppliers(data);
-      } catch (error) {
-        console.error('Error loading ranking:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadRanking();
-  }, []);
+  useEffect(() => { fetchItems(); }, [search, filter]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="animate-spin text-[#D40000]" size={32} />
-      </div>
-    );
-  }
+  const openNew = () => {
+    setEditItem(null);
+    setForm({ code: '', name: '', contact_person: '', phone: '', email: '', rif: '', address: '', payment_terms: '', lead_time_days: '', notes: '' });
+    setShowForm(true); setError('');
+  };
+
+  const openEdit = (item: any) => {
+    setEditItem(item);
+    setForm({
+      code: item.code || '', name: item.name, contact_person: item.contact_person || '',
+      phone: item.phone || '', email: item.email || '', rif: item.rif || '',
+      address: item.address || '', payment_terms: item.payment_terms || '',
+      lead_time_days: item.lead_time_days || '', notes: item.notes || '',
+    });
+    setShowForm(true); setError('');
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim()) { setError('Nombre requerido'); return; }
+    setSaving(true); setError('');
+    const body = { ...form, lead_time_days: form.lead_time_days ? Number(form.lead_time_days) : null, code: form.code || null };
+    const json = editItem
+      ? await api(`/api/purchases/suppliers/${editItem.id}`, { method: 'PATCH', body: JSON.stringify(body) })
+      : await api('/api/purchases/suppliers', { method: 'POST', body: JSON.stringify(body) });
+    if (json.ok) { setShowForm(false); fetchItems(); }
+    else setError(json.error || 'Error');
+    setSaving(false);
+  };
+
+  const toggleActive = async (item: any) => {
+    const json = await api(`/api/purchases/suppliers/${item.id}`, { method: 'DELETE' });
+    if (json.ok) fetchItems();
+  };
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-black text-gray-800 tracking-tighter uppercase">Ranking Fordmac</h2>
-          <p className="text-xs text-gray-500 font-medium">Medición de efectividad y lead time real de proveedores.</p>
+          <h2 className="text-2xl font-bold text-gray-800">Proveedores</h2>
+          <p className="text-sm text-gray-500 mt-1">Gestión de proveedores y condiciones de compra</p>
         </div>
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setFilterUrgent(!filterUrgent)}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${
-              filterUrgent ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-600 border-gray-200'
-            }`}
-          >
-            SOLO URGENTES
-          </button>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="bg-[#D40000] text-white px-6 py-3 rounded-xl text-sm font-black shadow-lg hover:bg-black hover:scale-105 transition-all flex items-center gap-2"
-          >
-            <PlusCircle size={18} />
-            NUEVO PROVEEDOR
-          </button>
-        </div>
+        <button onClick={openNew} className="flex items-center gap-2 bg-[#009FE3] text-white px-4 py-2.5 rounded-xl hover:bg-[#0088c4] text-sm font-semibold">
+          <Plus size={18} /> Nuevo proveedor
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {suppliers.map(function(s) {
-          const stars = [];
-          const starCount = Math.round(s.stars || 0);
-          for (let i = 0; i < 5; i++) {
-            const isFull = i < starCount;
-            stars.push(
-              <Star key={i} size={14} className={isFull ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200'} />
-            );
-          }
-          
-          return (
-            <div key={s.supplier_code} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col hover:shadow-xl transition-all group">
-              <div className="flex justify-between items-start mb-6">
-                <div className="p-3 bg-gray-50 rounded-xl group-hover:bg-red-50 transition-colors">
-                  <Truck className="text-[#D40000]" size={24} />
-                </div>
-                <div className="flex items-center space-x-1">
-                  {stars}
-                </div>
-              </div>
-              
-              <div className="mb-6">
-                <h3 className="font-black text-lg leading-tight text-gray-800 uppercase tracking-tight">{s.supplier_name}</h3>
-                <p className="text-[10px] text-gray-400 font-mono mt-1 font-bold">CÓDIGO: {s.supplier_code}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 py-6 border-y border-gray-50 mb-6">
-                <div className="flex flex-col group/tip relative">
-                  <span className="text-[9px] uppercase font-black text-gray-400 flex items-center gap-1">
-                    <Clock size={10} className="text-[#D40000]" /> Lead Time
-                    <Info size={10} className="text-gray-300 cursor-help" />
-                  </span>
-                  <span className="text-2xl font-black text-gray-800 tracking-tighter mt-1">
-                    {s.avgLeadTime?.toFixed(1) || '--'} 
-                    <span className="text-[10px] font-medium text-gray-400 uppercase ml-1">días</span>
-                  </span>
-                  <div className="absolute bottom-full left-0 mb-2 hidden group-hover/tip:block bg-black text-white text-[8px] p-2 rounded shadow-xl z-10 w-32">
-                    Promedio días entre Fecha OC y Recepción Efectiva.
-                  </div>
-                </div>
-                <div className="flex flex-col group/tip relative">
-                  <span className="text-[9px] uppercase font-black text-gray-400 flex items-center gap-1">
-                    <CheckCircle size={10} className="text-emerald-500" /> Fill Rate
-                    <Info size={10} className="text-gray-300 cursor-help" />
-                  </span>
-                  <span className="text-2xl font-black text-gray-800 tracking-tighter mt-1">
-                    {s.fillRate ? (s.fillRate * 100).toFixed(0) : '0'}%
-                  </span>
-                  <div className="absolute bottom-full left-0 mb-2 hidden group-hover/tip:block bg-black text-white text-[8px] p-2 rounded shadow-xl z-10 w-32">
-                    (Cantidad Recibida / Cantidad Pedida) acumulado.
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between items-center text-[10px] font-black uppercase text-gray-500 tracking-widest group/tip relative">
-                  <span className="flex items-center gap-1">Puntualidad <Info size={10} className="text-gray-300" /></span>
-                  <span className={(s.punctuality || 0) > 0.8 ? 'text-emerald-600' : 'text-[#D40000]'}>
-                    {(s.punctuality || 0 * 100).toFixed(0)}%
-                  </span>
-                  <div className="absolute bottom-full right-0 mb-2 hidden group-hover/tip:block bg-black text-white text-[8px] p-2 rounded shadow-xl z-10 w-32">
-                    % de entregas en o antes de la fecha prometida.
-                  </div>
-                </div>
-                <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full transition-all duration-1000 ${
-                      (s.punctuality || 0) > 0.8 ? 'bg-emerald-500' : 
-                      ((s.punctuality || 0) > 0.5 ? 'bg-orange-500' : 'bg-[#D40000]')
-                    }`} 
-                    style={{ width: (s.punctuality || 0) * 100 + '%' }} 
-                  />
-                </div>
-              </div>
-
-              <button className="w-full mt-6 py-3 bg-gray-50 text-gray-700 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#D40000] hover:text-white transition-all border border-gray-100">
-                Ver Historial OC
-              </button>
-            </div>
-          );
-        })}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre, código o RIF..." className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#009FE3]" />
+        </div>
+        <select value={filter} onChange={e => setFilter(e.target.value)} className="border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm">
+          <option value="all">Todos</option>
+          <option value="active">Activos</option>
+          <option value="inactive">Inactivos</option>
+        </select>
       </div>
 
-      {/* Create Supplier Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col">
-            {/* Header */}
-            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
-              <div>
-                <h3 className="text-xl font-black text-gray-800 uppercase tracking-tighter flex items-center gap-2">
-                  <Truck className="text-[#D40000]" size={24} />
-                  Registrar Nuevo Proveedor
-                </h3>
-                <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">
-                  Mapeado automático correlativo SUP
-                </p>
-              </div>
-              <button 
-                onClick={() => setIsModalOpen(false)} 
-                className="p-2 hover:bg-gray-200 rounded-xl transition-colors"
-              >
-                <XCircle size={24} className="text-gray-400" />
-              </button>
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-100 sticky top-0 bg-white">
+              <h3 className="text-lg font-bold text-gray-800">{editItem ? 'Editar' : 'Nuevo'} proveedor</h3>
+              <button onClick={() => setShowForm(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X size={20} className="text-gray-400" /></button>
             </div>
-
-            {/* Form */}
-            <form onSubmit={handleCreateSupplier} className="p-6 space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Nombre o Razón Social *</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                    <Truck size={16} />
-                  </span>
-                  <input 
-                    type="text" 
-                    required
-                    value={newSupplier.supplier_name}
-                    onChange={e => setNewSupplier({ ...newSupplier, supplier_name: e.target.value })}
-                    placeholder="Ej: REPUESTOS FORD VALENCIA, C.A."
-                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent focus:border-[#D40000] focus:bg-white rounded-xl font-bold text-gray-700 transition-all outline-none"
-                  />
-                </div>
-              </div>
-
+            <form onSubmit={handleSave} className="p-6 space-y-4">
+              {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm">{error}</div>}
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">RIF</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                      <FileText size={16} />
-                    </span>
-                    <input 
-                      type="text" 
-                      value={newSupplier.rif}
-                      onChange={e => setNewSupplier({ ...newSupplier, rif: e.target.value })}
-                      placeholder="J-12345678-9"
-                      className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent focus:border-[#D40000] focus:bg-white rounded-xl font-bold text-gray-700 transition-all outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Teléfono</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                      <Phone size={16} />
-                    </span>
-                    <input 
-                      type="text" 
-                      value={newSupplier.phone}
-                      onChange={e => setNewSupplier({ ...newSupplier, phone: e.target.value })}
-                      placeholder="0412-1234567"
-                      className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent focus:border-[#D40000] focus:bg-white rounded-xl font-bold text-gray-700 transition-all outline-none"
-                    />
-                  </div>
-                </div>
+                <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Código</label>
+                  <input type="text" value={form.code} onChange={e => setForm((f: any) => ({ ...f, code: e.target.value }))} className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]" /></div>
+                <div><label className="text-xs font-semibold text-gray-700 mb-1 block">RIF</label>
+                  <input type="text" value={form.rif} onChange={e => setForm((f: any) => ({ ...f, rif: e.target.value }))} className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]" /></div>
               </div>
-
+              <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Nombre *</label>
+                <input type="text" required value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]" /></div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Correo Electrónico</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                      <Mail size={16} />
-                    </span>
-                    <input 
-                      type="email" 
-                      value={newSupplier.email}
-                      onChange={e => setNewSupplier({ ...newSupplier, email: e.target.value })}
-                      placeholder="contacto@proveedor.com"
-                      className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent focus:border-[#D40000] focus:bg-white rounded-xl font-bold text-gray-700 transition-all outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Persona de Contacto</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                      <User size={16} />
-                    </span>
-                    <input 
-                      type="text" 
-                      value={newSupplier.contact_name}
-                      onChange={e => setNewSupplier({ ...newSupplier, contact_name: e.target.value })}
-                      placeholder="Juan Pérez"
-                      className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent focus:border-[#D40000] focus:bg-white rounded-xl font-bold text-gray-700 transition-all outline-none"
-                    />
-                  </div>
-                </div>
+                <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Persona de contacto</label>
+                  <input type="text" value={form.contact_person} onChange={e => setForm((f: any) => ({ ...f, contact_person: e.target.value }))} className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]" /></div>
+                <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Teléfono</label>
+                  <input type="text" value={form.phone} onChange={e => setForm((f: any) => ({ ...f, phone: e.target.value }))} className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]" /></div>
               </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Dirección Física</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-3.5 text-gray-400">
-                    <MapPin size={16} />
-                  </span>
-                  <textarea 
-                    value={newSupplier.address}
-                    onChange={e => setNewSupplier({ ...newSupplier, address: e.target.value })}
-                    placeholder="Ej: Zona Industrial, Calle 2, Valencia"
-                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent focus:border-[#D40000] focus:bg-white rounded-xl font-bold text-gray-700 transition-all outline-none h-20 resize-none"
-                  />
-                </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Correo</label>
+                  <input type="email" value={form.email} onChange={e => setForm((f: any) => ({ ...f, email: e.target.value }))} className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]" /></div>
+                <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Condiciones de pago</label>
+                  <select value={form.payment_terms} onChange={e => setForm((f: any) => ({ ...f, payment_terms: e.target.value }))} className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]">
+                    <option value="">Seleccionar...</option>
+                    <option value="contado">Contado</option>
+                    <option value="15">15 días</option>
+                    <option value="30">30 días</option>
+                    <option value="45">45 días</option>
+                    <option value="60">60 días</option>
+                  </select></div>
               </div>
-
-              <div className="pt-4 flex gap-4">
-                <button 
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-gray-200 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit"
-                  disabled={saving || !newSupplier.supplier_name.trim()}
-                  className="flex-1 py-3 bg-[#D40000] text-white rounded-xl font-black uppercase tracking-widest text-xs shadow-lg shadow-red-500/20 hover:shadow-red-500/40 hover:-translate-y-0.5 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {saving ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle size={16} />}
-                  {saving ? 'Guardando...' : 'Crear Proveedor'}
-                </button>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Lead time (días)</label>
+                  <input type="number" value={form.lead_time_days} onChange={e => setForm((f: any) => ({ ...f, lead_time_days: e.target.value }))} className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]" /></div>
               </div>
+              <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Dirección</label>
+                <textarea value={form.address} onChange={e => setForm((f: any) => ({ ...f, address: e.target.value }))} rows={2} className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]" /></div>
+              <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Notas</label>
+                <textarea value={form.notes} onChange={e => setForm((f: any) => ({ ...f, notes: e.target.value }))} rows={2} className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]" /></div>
+              <button type="submit" disabled={saving} className="w-full bg-[#009FE3] text-white font-semibold py-2.5 rounded-xl hover:bg-[#0088c4] text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Guardar
+              </button>
             </form>
           </div>
         </div>
       )}
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {loading ? (
+          <div className="p-12 text-center text-gray-400"><Loader2 className="animate-spin mx-auto mb-2" size={24} />Cargando...</div>
+        ) : items.length === 0 ? (
+          <div className="p-12 text-center"><Building2 className="mx-auto text-gray-300 mb-3" size={48} /><p className="text-gray-500">Sin proveedores</p></div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-100">
+                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">Proveedor</th>
+                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">RIF</th>
+                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">Contacto</th>
+                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">Teléfono</th>
+                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">Pago</th>
+                <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4">Lead time</th>
+                <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-4"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(item => (
+                <tr key={item.id} className={`border-b border-gray-50 hover:bg-gray-50/50 ${!item.is_active ? 'opacity-50' : ''}`}>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-800">{item.name}</span>
+                      {item.code && <span className="text-xs font-mono text-gray-400">{item.code}</span>}
+                    </div>
+                    {item.email && <p className="text-xs text-gray-400">{item.email}</p>}
+                  </td>
+                  <td className="px-6 py-4"><span className="text-sm font-mono text-gray-600">{item.rif || '-'}</span></td>
+                  <td className="px-6 py-4"><span className="text-sm text-gray-600">{item.contact_person || '-'}</span></td>
+                  <td className="px-6 py-4"><span className="text-sm text-gray-600">{item.phone || '-'}</span></td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm text-gray-600">
+                      {item.payment_terms === 'contado' ? 'Contado' : item.payment_terms ? `${item.payment_terms} días` : '-'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right"><span className="text-sm text-gray-600">{item.lead_time_days ? `${item.lead_time_days}d` : '-'}</span></td>
+                  <td className="px-6 py-4 text-right">
+                    <button onClick={() => openEdit(item)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-[#009FE3]"><Pencil size={16} /></button>
+                    {item.is_active && <button onClick={() => toggleActive(item)} className="p-2 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500"><X size={16} /></button>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
