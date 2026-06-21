@@ -998,6 +998,85 @@ app.post("/api/agent/mercatech/update", requireMercatechToken, async (req, res) 
 });
 
 // =============================================================================
+// Restaurant: Ingredients CRUD
+// =============================================================================
+
+// GET /api/restaurant/ingredients
+app.get("/api/restaurant/ingredients", requireJwt, async (req, res) => {
+  try {
+    const search = req.query.search || '';
+    const filter = req.query.filter || 'all';
+    let sql = "SELECT * FROM public.restaurant_ingredients WHERE 1=1";
+    const params = [];
+    if (search) {
+      sql += " AND (name ILIKE $" + (params.length + 1) + " OR code ILIKE $" + (params.length + 1) + ")";
+      params.push(`%${search}%`);
+    }
+    if (filter === 'active') { sql += " AND is_active = true"; }
+    else if (filter === 'inactive') { sql += " AND is_active = false"; }
+    else if (filter === 'low_stock') { sql += " AND is_active = true AND stock <= min_stock"; }
+    sql += " ORDER BY name ASC";
+    const { rows } = await pool.query(sql, params);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/restaurant/ingredients
+app.post("/api/restaurant/ingredients", requireJwt, async (req, res) => {
+  try {
+    const { code, name, category, unit, cost, stock, min_stock } = req.body || {};
+    if (!name) return res.status(400).json({ ok: false, error: "name required" });
+    const { rows } = await pool.query(
+      `INSERT INTO public.restaurant_ingredients (code, name, category, unit, cost, stock, min_stock)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [code || '', name, category || '', unit || 'unidad', cost || 0, stock || 0, min_stock || 0]
+    );
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/restaurant/ingredients/:id
+app.patch("/api/restaurant/ingredients/:id", requireJwt, async (req, res) => {
+  try {
+    const sets = [];
+    const params = [];
+    let idx = 0;
+    for (const key of ['code', 'name', 'category', 'unit', 'cost', 'stock', 'min_stock', 'is_active']) {
+      if (req.body[key] !== undefined) {
+        idx++; sets.push(`${key} = $${idx}`); params.push(req.body[key]);
+      }
+    }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields" });
+    idx++; params.push(req.params.id);
+    const { rows } = await pool.query(
+      `UPDATE public.restaurant_ingredients SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`, params
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// DELETE /api/restaurant/ingredients/:id
+app.delete("/api/restaurant/ingredients/:id", requireJwt, async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      "UPDATE public.restaurant_ingredients SET is_active = false WHERE id = $1 AND is_active = true",
+      [req.params.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ ok: false, error: "not found or already inactive" });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// =============================================================================
 // Support Module
 // =============================================================================
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
