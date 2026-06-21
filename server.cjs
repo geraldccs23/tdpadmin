@@ -1077,6 +1077,153 @@ app.delete("/api/restaurant/ingredients/:id", requireJwt, async (req, res) => {
 });
 
 // =============================================================================
+// Restaurant: Recipes CRUD
+// =============================================================================
+
+// GET /api/restaurant/recipes
+app.get("/api/restaurant/recipes", requireJwt, async (req, res) => {
+  try {
+    const search = req.query.search || '';
+    const filter = req.query.filter || 'all';
+    let sql = `SELECT r.*,
+      COALESCE((SELECT SUM(COALESCE(ri.quantity, 0) * COALESCE(ri.cost_snapshot, i.cost, 0))
+       FROM public.restaurant_recipe_items ri
+       LEFT JOIN public.restaurant_ingredients i ON i.id = ri.ingredient_id
+       WHERE ri.recipe_id = r.id), 0) AS calculated_cost,
+      (SELECT COUNT(*) FROM public.restaurant_recipe_items WHERE recipe_id = r.id) AS ingredient_count
+      FROM public.restaurant_recipes r WHERE 1=1`;
+    const params = [];
+    if (search) {
+      sql += " AND (r.name ILIKE $" + (params.length + 1) + " OR r.code ILIKE $" + (params.length + 1) + " OR r.category ILIKE $" + (params.length + 1) + ")";
+      params.push(`%${search}%`);
+    }
+    if (filter === 'active') { sql += " AND r.is_active = true"; }
+    else if (filter === 'inactive') { sql += " AND r.is_active = false"; }
+    sql += " ORDER BY r.name ASC";
+    const { rows } = await pool.query(sql, params);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/restaurant/recipes/:id
+app.get("/api/restaurant/recipes/:id", requireJwt, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT r.* FROM public.restaurant_recipes r WHERE r.id = $1`, [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    const { rows: items } = await pool.query(
+      `SELECT ri.*, i.name AS ingredient_name, i.code AS ingredient_code, i.unit AS ingredient_unit, i.cost AS ingredient_cost
+       FROM public.restaurant_recipe_items ri
+       LEFT JOIN public.restaurant_ingredients i ON i.id = ri.ingredient_id
+       WHERE ri.recipe_id = $1 ORDER BY ri.created_at ASC`, [req.params.id]
+    );
+    res.json({ ok: true, data: { ...rows[0], items } });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/restaurant/recipes
+app.post("/api/restaurant/recipes", requireJwt, async (req, res) => {
+  try {
+    const { code, name, category, description, preparation_time_minutes, portions, instructions } = req.body || {};
+    if (!name) return res.status(400).json({ ok: false, error: "name required" });
+    const { rows } = await pool.query(
+      `INSERT INTO public.restaurant_recipes (code, name, category, description, preparation_time_minutes, portions, instructions)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [code || '', name, category || '', description || '', preparation_time_minutes || null, portions || 1, instructions || '']
+    );
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/restaurant/recipes/:id
+app.patch("/api/restaurant/recipes/:id", requireJwt, async (req, res) => {
+  try {
+    const sets = []; const params = []; let idx = 0;
+    for (const key of ['code','name','category','description','preparation_time_minutes','portions','instructions','cost','is_active']) {
+      if (req.body[key] !== undefined) { idx++; sets.push(`${key} = $${idx}`); params.push(req.body[key]); }
+    }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields" });
+    idx++; params.push(req.params.id);
+    const { rows } = await pool.query(
+      `UPDATE public.restaurant_recipes SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`, params
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// DELETE /api/restaurant/recipes/:id — soft delete
+app.delete("/api/restaurant/recipes/:id", requireJwt, async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      "UPDATE public.restaurant_recipes SET is_active = false WHERE id = $1 AND is_active = true", [req.params.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/restaurant/recipes/:id/items — add ingredient to recipe
+app.post("/api/restaurant/recipes/:id/items", requireJwt, async (req, res) => {
+  try {
+    const { ingredient_id, quantity, unit } = req.body || {};
+    if (!ingredient_id || !quantity) return res.status(400).json({ ok: false, error: "ingredient_id and quantity required" });
+    // Snapshot the ingredient cost at time of adding
+    const { rows: ing } = await pool.query("SELECT cost FROM public.restaurant_ingredients WHERE id = $1", [ingredient_id]);
+    const cost_snapshot = ing.length > 0 ? ing[0].cost : 0;
+    const { rows } = await pool.query(
+      `INSERT INTO public.restaurant_recipe_items (recipe_id, ingredient_id, quantity, unit, cost_snapshot)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [req.params.id, ingredient_id, quantity, unit || 'unidad', cost_snapshot]
+    );
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/restaurant/recipe-items/:itemId
+app.patch("/api/restaurant/recipe-items/:itemId", requireJwt, async (req, res) => {
+  try {
+    const sets = []; const params = []; let idx = 0;
+    for (const key of ['quantity', 'unit', 'cost_snapshot']) {
+      if (req.body[key] !== undefined) { idx++; sets.push(`${key} = $${idx}`); params.push(req.body[key]); }
+    }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields" });
+    idx++; params.push(req.params.itemId);
+    const { rows } = await pool.query(
+      `UPDATE public.restaurant_recipe_items SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`, params
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// DELETE /api/restaurant/recipe-items/:itemId
+app.delete("/api/restaurant/recipe-items/:itemId", requireJwt, async (req, res) => {
+  try {
+    const { rowCount } = await pool.query("DELETE FROM public.restaurant_recipe_items WHERE id = $1", [req.params.itemId]);
+    if (rowCount === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// =============================================================================
 // Support Module
 // =============================================================================
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
