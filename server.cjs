@@ -1685,6 +1685,223 @@ app.delete("/api/purchases/suppliers/:id", requireJwt, async (req, res) => {
 });
 
 // =============================================================================
+// Purchases: Orders CRUD
+// =============================================================================
+
+// GET /api/purchases/orders
+app.get("/api/purchases/orders", requireJwt, async (req, res) => {
+  try {
+    const search = req.query.search || '';
+    const status = req.query.status || '';
+    const approval = req.query.approval_status || '';
+    let sql = `SELECT po.*, ps.name AS supplier_name, cw.name AS warehouse_name,
+      (SELECT COUNT(*) FROM public.purchase_order_lines WHERE order_id = po.id) AS line_count
+      FROM public.purchase_orders po
+      LEFT JOIN public.purchase_suppliers ps ON ps.id = po.supplier_id
+      LEFT JOIN public.company_warehouses cw ON cw.id = po.warehouse_id
+      WHERE 1=1`;
+    const params = [];
+    if (search) {
+      sql += ` AND (po.order_number ILIKE $${params.length + 1} OR ps.name ILIKE $${params.length + 1})`;
+      params.push(`%${search}%`);
+    }
+    if (status) { sql += ` AND po.status = $${params.length + 1}`; params.push(status); }
+    if (approval) { sql += ` AND po.approval_status = $${params.length + 1}`; params.push(approval); }
+    sql += " ORDER BY po.created_at DESC LIMIT 100";
+    const { rows } = await pool.query(sql, params);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/purchases/orders/:id
+app.get("/api/purchases/orders/:id", requireJwt, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT po.*, ps.name AS supplier_name, ps.rif AS supplier_rif, ps.phone AS supplier_phone,
+        cw.name AS warehouse_name,
+        u_creator.email AS created_by_email
+       FROM public.purchase_orders po
+       LEFT JOIN public.purchase_suppliers ps ON ps.id = po.supplier_id
+       LEFT JOIN public.company_warehouses cw ON cw.id = po.warehouse_id
+       LEFT JOIN public.users u_creator ON u_creator.id = po.created_by
+       WHERE po.id = $1`, [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    const { rows: lines } = await pool.query(
+      `SELECT pol.*, COALESCE(i.name, ip.name) AS item_name
+       FROM public.purchase_order_lines pol
+       LEFT JOIN public.restaurant_ingredients i ON pol.item_type = 'ingredient' AND pol.item_id = i.id
+       LEFT JOIN public.restaurant_inventory_products ip ON pol.item_type = 'inventory_product' AND pol.item_id = ip.id
+       WHERE pol.order_id = $1 ORDER BY pol.created_at ASC`, [req.params.id]
+    );
+    res.json({ ok: true, data: { ...rows[0], lines } });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/purchases/orders
+app.post("/api/purchases/orders", requireJwt, async (req, res) => {
+  try {
+    const { supplier_id, warehouse_id, expected_date, notes, items } = req.body || {};
+    if (!supplier_id) return res.status(400).json({ ok: false, error: "supplier required" });
+    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ ok: false, error: "at least one item required" });
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      let subtotal = 0;
+      const lineValues = [];
+      for (const item of items) {
+        const qty = Number(item.quantity_ordered) || 0;
+        const cost = Number(item.unit_cost) || 0;
+        const total = qty * cost;
+        subtotal += total;
+        lineValues.push({ ...item, quantity_ordered: qty, unit_cost: cost, total_line: total });
+      }
+
+      const { rows: orderRows } = await client.query(
+        `INSERT INTO public.purchase_orders (supplier_id, warehouse_id, expected_date, notes, subtotal, total, created_by)
+         VALUES ($1,$2,$3,$4,$5,$5,$6) RETURNING *`,
+        [supplier_id, warehouse_id || null, expected_date || null, notes || '', subtotal, req.user.id]
+      );
+      const order = orderRows[0];
+
+      for (const line of lineValues) {
+        await client.query(
+          `INSERT INTO public.purchase_order_lines (order_id, item_type, item_id, item_name, quantity_ordered, unit_cost, total_line)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [order.id, line.item_type, line.item_id, line.item_name || '', line.quantity_ordered, line.unit_cost, line.total_line]
+        );
+      }
+
+      await client.query("COMMIT");
+      const fullOrder = await pool.query(
+        `SELECT po.*, ps.name AS supplier_name FROM public.purchase_orders po
+         LEFT JOIN public.purchase_suppliers ps ON ps.id = po.supplier_id WHERE po.id = $1`, [order.id]
+      );
+      res.json({ ok: true, data: fullOrder.rows[0] });
+    } catch (e) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/purchases/orders/:id
+app.patch("/api/purchases/orders/:id", requireJwt, async (req, res) => {
+  try {
+    const { supplier_id, warehouse_id, expected_date, notes, items } = req.body || {};
+    if (items) {
+      // Full replace: recalculate totals from items
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        let subtotal = 0;
+        await client.query("DELETE FROM public.purchase_order_lines WHERE order_id = $1", [req.params.id]);
+        for (const item of items) {
+          const qty = Number(item.quantity_ordered) || 0;
+          const cost = Number(item.unit_cost) || 0;
+          const total = qty * cost;
+          subtotal += total;
+          await client.query(
+            `INSERT INTO public.purchase_order_lines (order_id, item_type, item_id, item_name, quantity_ordered, unit_cost, total_line)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            [req.params.id, item.item_type, item.item_id, item.item_name || '', qty, cost, total]
+          );
+        }
+        await client.query(
+          `UPDATE public.purchase_orders SET subtotal = $1, total = $1 WHERE id = $2`,
+          [subtotal, req.params.id]
+        );
+        await client.query("COMMIT");
+      } catch (e) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw e;
+      } finally {
+        client.release();
+      }
+    }
+    // Update fields
+    const sets = []; const params = []; let idx = 0;
+    for (const key of ['supplier_id', 'warehouse_id', 'expected_date', 'notes']) {
+      if (req.body[key] !== undefined) { idx++; sets.push(`${key} = $${idx}`); params.push(req.body[key]); }
+    }
+    if (sets.length > 0) {
+      idx++; params.push(req.params.id);
+      await pool.query(`UPDATE public.purchase_orders SET ${sets.join(', ')} WHERE id = $${idx}`, params);
+    }
+    const { rows } = await pool.query("SELECT * FROM public.purchase_orders WHERE id = $1", [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// DELETE /api/purchases/orders/:id — cancel
+app.delete("/api/purchases/orders/:id", requireJwt, async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT status FROM public.purchase_orders WHERE id = $1", [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    if (rows[0].status === 'received') return res.status(400).json({ ok: false, error: "cannot cancel received order" });
+    await pool.query("UPDATE public.purchase_orders SET status = 'cancelled' WHERE id = $1", [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/purchases/orders/:id/approve
+app.post("/api/purchases/orders/:id/approve", requireJwt, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `UPDATE public.purchase_orders SET approval_status = 'approved', approved_by = $1, approved_at = NOW()
+       WHERE id = $2 AND approval_status = 'pending' RETURNING *`,
+      [req.user.id, req.params.id]
+    );
+    if (rows.length === 0) return res.status(400).json({ ok: false, error: "order not found or already processed" });
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/purchases/orders/:id/reject
+app.post("/api/purchases/orders/:id/reject", requireJwt, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `UPDATE public.purchase_orders SET approval_status = 'rejected' WHERE id = $1 AND approval_status = 'pending' RETURNING *`,
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(400).json({ ok: false, error: "order not found or already processed" });
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/purchases/orders/:id/send
+app.post("/api/purchases/orders/:id/send", requireJwt, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `UPDATE public.purchase_orders SET status = 'sent' WHERE id = $1 AND approval_status = 'approved' AND status = 'draft' RETURNING *`,
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(400).json({ ok: false, error: "order must be approved first or already sent" });
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// =============================================================================
 // Support Module
 // =============================================================================
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";

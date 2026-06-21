@@ -762,6 +762,18 @@ export default function App() {
             userPermissions={permissions}
           />
           <NavItem
+            icon={ClipboardList}
+            label="Órdenes de Compra"
+            view="purchase_orders"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["admin", "compras", "supervisor"]}
+            userRole={userRole}
+            perm="inventory.view"
+            userPermissions={permissions}
+          />
+          <NavItem
             icon={Globe}
             label="Menú Público"
             view="public_menu"
