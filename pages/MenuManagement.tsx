@@ -43,6 +43,7 @@ export function MenuManagement() {
   const [cats, setCats] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
   const [recipes, setRecipes] = useState<any[]>([]);
+  const [invProducts, setInvProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('');
@@ -65,8 +66,10 @@ export function MenuManagement() {
     setLoading(false);
   };
   const fetchRecipes = async () => {
-    const json = await api('/api/restaurant/recipes?filter=active');
-    if (json.ok) setRecipes(json.data || []);
+    const r = await api('/api/restaurant/recipes?filter=active');
+    if (r.ok) setRecipes(r.data || []);
+    const p = await api('/api/restaurant/inventory-products?filter=active');
+    if (p.ok) setInvProducts(p.data || []);
   };
 
   useEffect(() => { fetchCats(); fetchRecipes(); }, []);
@@ -87,13 +90,14 @@ export function MenuManagement() {
 
   const newItem = () => {
     setEditItem(null);
-    setForm({ category_id: cats[0]?.id || '', recipe_id: '', code: '', name: '', description: '', price: 0, cost: '', image_url: '', display_order: 0 });
+    setForm({ category_id: cats[0]?.id || '', item_type: 'recipe', recipe_id: '', inventory_product_id: '', code: '', name: '', description: '', price: 0, cost: '', image_url: '', display_order: 0 });
     setShowForm(true);
   };
   const editItemFn = async (item: any) => {
     setEditItem(item);
     setForm({
-      category_id: item.category_id, recipe_id: item.recipe_id || '', code: item.code || '',
+      category_id: item.category_id, item_type: item.item_type || 'recipe', recipe_id: item.recipe_id || '',
+      inventory_product_id: item.inventory_product_id || '', code: item.code || '',
       name: item.name, description: item.description || '', price: Number(item.price),
       cost: item.cost !== null ? item.cost : '', image_url: item.image_url || '', display_order: item.display_order || 0,
     });
@@ -107,6 +111,7 @@ export function MenuManagement() {
     const body = {
       ...form,
       recipe_id: form.recipe_id || null,
+      inventory_product_id: form.inventory_product_id || null,
       price: Number(form.price),
       cost: form.cost !== '' ? Number(form.cost) : null,
     };
@@ -203,13 +208,32 @@ export function MenuManagement() {
               <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Descripción</label>
                 <textarea value={form.description} onChange={e => setForm((f: any) => ({ ...f, description: e.target.value }))} rows={2}
                   className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]" /></div>
+              <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Tipo</label>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setForm((f: any) => ({ ...f, item_type: 'recipe', recipe_id: '', inventory_product_id: '', cost: '' }))}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${form.item_type === 'recipe' ? 'bg-[#009FE3] text-white shadow-sm' : 'bg-gray-100 text-gray-600'}`}>Receta</button>
+                  <button type="button" onClick={() => setForm((f: any) => ({ ...f, item_type: 'inventory_product', recipe_id: '', inventory_product_id: '', cost: '' }))}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${form.item_type === 'inventory_product' ? 'bg-[#009FE3] text-white shadow-sm' : 'bg-gray-100 text-gray-600'}`}>Producto directo</button>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Receta (opcional)</label>
-                  <select value={form.recipe_id} onChange={e => handleRecipeSelect(e.target.value)}
-                    className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]">
-                    <option value="">Sin receta</option>
-                    {recipes.map(r => <option key={r.id} value={r.id}>{r.name} (costo: ${Number(r.calculated_cost || 0).toFixed(2)})</option>)}
-                  </select></div>
+                {form.item_type === 'recipe' ? (
+                  <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Receta</label>
+                    <select value={form.recipe_id} onChange={e => handleRecipeSelect(e.target.value)}
+                      className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]">
+                      <option value="">Seleccionar receta...</option>
+                      {recipes.map(r => <option key={r.id} value={r.id}>{r.name} (costo: $${Number(r.calculated_cost || 0).toFixed(2)})</option>)}
+                    </select></div>
+                ) : (
+                  <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Producto inventariable</label>
+                    <select value={form.inventory_product_id} onChange={e => {
+                      const p = invProducts.find(x => x.id === e.target.value);
+                      setForm((f: any) => ({ ...f, inventory_product_id: e.target.value, cost: p ? Number(p.cost) : f.cost }));
+                    }} className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]">
+                      <option value="">Seleccionar producto...</option>
+                      {invProducts.map(p => <option key={p.id} value={p.id}>{p.name} (costo: $${Number(p.cost).toFixed(2)})</option>)}
+                    </select></div>
+                )}
                 <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Precio ($)</label>
                   <input type="number" step="0.01" value={form.price} onChange={e => setForm((f: any) => ({ ...f, price: e.target.value }))}
                     className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]" /></div>

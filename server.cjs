@@ -1271,6 +1271,77 @@ app.delete("/api/restaurant/recipe-items/:itemId", requireJwt, async (req, res) 
 });
 
 // =============================================================================
+// Restaurant: Inventory Products CRUD
+// =============================================================================
+
+app.get("/api/restaurant/inventory-products", requireJwt, async (req, res) => {
+  try {
+    const search = req.query.search || '';
+    const filter = req.query.filter || 'all';
+    let sql = "SELECT * FROM public.restaurant_inventory_products WHERE 1=1";
+    const params = [];
+    if (search) {
+      sql += " AND (name ILIKE $" + (params.length + 1) + " OR code ILIKE $" + (params.length + 1) + " OR barcode ILIKE $" + (params.length + 1) + ")";
+      params.push(`%${search}%`);
+    }
+    if (filter === 'active') { sql += " AND is_active = true"; }
+    else if (filter === 'inactive') { sql += " AND is_active = false"; }
+    else if (filter === 'low_stock') { sql += " AND is_active = true AND current_stock <= minimum_stock"; }
+    sql += " ORDER BY name ASC";
+    const { rows } = await pool.query(sql, params);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+app.post("/api/restaurant/inventory-products", requireJwt, async (req, res) => {
+  try {
+    const { code, barcode, name, category, unit, cost, sale_price, current_stock, minimum_stock, warehouse_id, supplier_id } = req.body || {};
+    if (!name) return res.status(400).json({ ok: false, error: "name required" });
+    const { rows } = await pool.query(
+      `INSERT INTO public.restaurant_inventory_products (code, barcode, name, category, unit, cost, sale_price, current_stock, minimum_stock, warehouse_id, supplier_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [code || null, barcode || '', name, category || '', unit || 'unidad', cost || 0, sale_price || 0, current_stock || 0, minimum_stock || 0, warehouse_id || null, supplier_id || null]
+    );
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    const msg = e?.constraint === 'restaurant_inventory_products_code_key' ? 'code already exists' : String(e?.message || e);
+    res.status(400).json({ ok: false, error: msg });
+  }
+});
+
+app.patch("/api/restaurant/inventory-products/:id", requireJwt, async (req, res) => {
+  try {
+    const sets = []; const params = []; let idx = 0;
+    for (const key of ['code','barcode','name','category','unit','cost','sale_price','current_stock','minimum_stock','warehouse_id','supplier_id','is_active']) {
+      if (req.body[key] !== undefined) { idx++; sets.push(`${key} = $${idx}`); params.push(req.body[key]); }
+    }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields" });
+    idx++; params.push(req.params.id);
+    const { rows } = await pool.query(
+      `UPDATE public.restaurant_inventory_products SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`, params
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+app.delete("/api/restaurant/inventory-products/:id", requireJwt, async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      "UPDATE public.restaurant_inventory_products SET is_active = false WHERE id = $1 AND is_active = true", [req.params.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// =============================================================================
 // Restaurant: Menu CRUD
 // =============================================================================
 
@@ -1336,12 +1407,17 @@ app.get("/api/restaurant/menu/items", requireJwt, async (req, res) => {
     const search = req.query.search || '';
     const cat = req.query.category || '';
     let sql = `SELECT mi.*, c.name AS category_name, r.name AS recipe_name,
-      COALESCE(mi.cost, (SELECT SUM(COALESCE(ri.quantity,0) * COALESCE(ri.cost_snapshot, i.cost, 0))
-       FROM public.restaurant_recipe_items ri LEFT JOIN public.restaurant_ingredients i ON i.id = ri.ingredient_id
-       WHERE ri.recipe_id = mi.recipe_id), 0) AS calculated_cost
+      ip.name AS inv_product_name, ip.cost AS inv_product_cost, ip.sale_price AS inv_sale_price,
+      CASE
+        WHEN mi.item_type = 'inventory_product' THEN ip.cost
+        ELSE COALESCE(mi.cost, (SELECT SUM(COALESCE(ri.quantity,0) * COALESCE(ri.cost_snapshot, i.cost, 0))
+          FROM public.restaurant_recipe_items ri LEFT JOIN public.restaurant_ingredients i ON i.id = ri.ingredient_id
+          WHERE ri.recipe_id = mi.recipe_id), 0)
+      END AS calculated_cost
       FROM public.restaurant_menu_items mi
       LEFT JOIN public.restaurant_categories c ON c.id = mi.category_id
       LEFT JOIN public.restaurant_recipes r ON r.id = mi.recipe_id
+      LEFT JOIN public.restaurant_inventory_products ip ON ip.id = mi.inventory_product_id
       WHERE 1=1`;
     const params = [];
     if (search) {
@@ -1359,12 +1435,12 @@ app.get("/api/restaurant/menu/items", requireJwt, async (req, res) => {
 
 app.post("/api/restaurant/menu/items", requireJwt, async (req, res) => {
   try {
-    const { category_id, recipe_id, code, name, description, price, cost, image_url, display_order } = req.body || {};
+    const { category_id, item_type, recipe_id, inventory_product_id, code, name, description, price, cost, image_url, display_order } = req.body || {};
     if (!name || !category_id) return res.status(400).json({ ok: false, error: "name and category required" });
     const { rows } = await pool.query(
-      `INSERT INTO public.restaurant_menu_items (category_id, recipe_id, code, name, description, price, cost, image_url, display_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [category_id, recipe_id || null, code || '', name, description || '', price || 0, cost || null, image_url || '', display_order || 0]
+      `INSERT INTO public.restaurant_menu_items (category_id, item_type, recipe_id, inventory_product_id, code, name, description, price, cost, image_url, display_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [category_id, item_type || 'recipe', recipe_id || null, inventory_product_id || null, code || '', name, description || '', price || 0, cost || null, image_url || '', display_order || 0]
     );
     res.json({ ok: true, data: rows[0] });
   } catch (e) {
@@ -1375,7 +1451,7 @@ app.post("/api/restaurant/menu/items", requireJwt, async (req, res) => {
 app.patch("/api/restaurant/menu/items/:id", requireJwt, async (req, res) => {
   try {
     const sets = []; const params = []; let idx = 0;
-    for (const key of ['category_id','recipe_id','code','name','description','price','cost','margin_percent','image_url','is_available','is_active','display_order']) {
+    for (const key of ['category_id','item_type','recipe_id','inventory_product_id','code','name','description','price','cost','margin_percent','image_url','is_available','is_active','display_order']) {
       if (req.body[key] !== undefined) { idx++; sets.push(`${key} = $${idx}`); params.push(req.body[key]); }
     }
     if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields" });
