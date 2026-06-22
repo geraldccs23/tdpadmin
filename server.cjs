@@ -1,8 +1,8 @@
-// restaurantdp — Backend Server
+// tdpadmin — Backend Server
 // - Agent API: /api/agent/* (auth: AGENT_TOKEN)
 // - Admin API: /api/agent/tokens (auth: ADMIN_API_TOKEN)
 // - Data Proxy: /api/data/* (auth: ADMIN_API_TOKEN)
-//   Replaces Supabase .from() calls for the frontend
+// - TDP Admin Auth: /api/tdp/auth/* (tdpadmin.users schema)
 
 require('dotenv').config();
 const express = require("express");
@@ -114,6 +114,95 @@ app.get("/api/auth/session", requireJwt, async (req, res) => {
 
 // POST /api/auth/logout
 app.post("/api/auth/logout", requireJwt, async (_req, res) => {
+  res.json({ ok: true });
+});
+
+// --------------------
+// TDP Admin Auth (tdpadmin.users)
+// --------------------
+
+function generateTDPToken(user) {
+  return jwt.sign(
+    { id: user.id, email: user.email, role: user.role, name: user.full_name, tdp: true },
+    JWT_SECRET,
+    { expiresIn: "24h" }
+  );
+}
+
+function requireTDPAuth(req, res, next) {
+  const h = req.headers["authorization"] || "";
+  const token = h.startsWith("Bearer ") ? h.slice(7) : "";
+  if (!token) return res.status(401).json({ ok: false, error: "missing token" });
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (!decoded.tdp) return res.status(401).json({ ok: false, error: "invalid token" });
+    req.tdpUser = decoded;
+    next();
+  } catch (e) {
+    return res.status(401).json({ ok: false, error: "invalid or expired token" });
+  }
+}
+
+// POST /api/tdp/auth/register
+app.post("/api/tdp/auth/register", async (req, res) => {
+  try {
+    const { email, password, full_name, role } = req.body || {};
+    if (!email || !password) return res.status(400).json({ ok: false, error: "email and password required" });
+    const hash = bcrypt.hashSync(password, 10);
+    const { rows } = await pool.query(
+      `INSERT INTO tdpadmin.users (email, password_hash, full_name, role) VALUES ($1, $2, $3, $4)
+       RETURNING id, email, full_name, role, status, created_at`,
+      [email.trim().toLowerCase(), hash, full_name || '', role || 'staff']
+    );
+    const user = rows[0];
+    const token = generateTDPToken(user);
+    res.json({ ok: true, token, user });
+  } catch (e) {
+    const msg = e?.constraint === 'tdpadmin_users_email_key' ? 'email already exists' : String(e?.message || e);
+    res.status(400).json({ ok: false, error: msg });
+  }
+});
+
+// POST /api/tdp/auth/login
+app.post("/api/tdp/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) return res.status(400).json({ ok: false, error: "email and password required" });
+    const { rows } = await pool.query(
+      "SELECT id, email, password_hash, full_name, role, status FROM tdpadmin.users WHERE email = $1 LIMIT 1",
+      [email.trim().toLowerCase()]
+    );
+    if (rows.length === 0) return res.status(401).json({ ok: false, error: "invalid credentials" });
+    const user = rows[0];
+    if (user.status !== 'active') return res.status(401).json({ ok: false, error: "account is not active" });
+    if (!bcrypt.compareSync(password, user.password_hash)) return res.status(401).json({ ok: false, error: "invalid credentials" });
+    await pool.query("UPDATE tdpadmin.users SET last_login_at = NOW() WHERE id = $1", [user.id]);
+    const token = generateTDPToken(user);
+    res.json({
+      ok: true, token,
+      user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role },
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/tdp/auth/me
+app.get("/api/tdp/auth/me", requireTDPAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT id, email, full_name, role, status, last_login_at, created_at FROM tdpadmin.users WHERE id = $1",
+      [req.tdpUser.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "user not found" });
+    res.json({ ok: true, user: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/auth/logout
+app.post("/api/tdp/auth/logout", requireTDPAuth, async (_req, res) => {
   res.json({ ok: true });
 });
 

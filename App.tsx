@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { dbService } from "./services/dbService";
 import { auth } from "./services/auth";
+import { tdpAuth } from "./services/tdpAuth";
 import { supabase } from "./services/supabase";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
@@ -512,26 +513,20 @@ export default function App() {
   };
 
   useEffect(() => {
-    auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setPermissions(session?.user?.permissions || null);
-      if (session?.user?.role) {
-        fetchUserRole(null, "", session.user.role);
-      } else if (session?.user?.id) {
-        fetchUserRole(session.user.id, session.user.email || "");
+    tdpAuth.getMe().then(({ data: user }) => {
+      if (user) {
+        setSession({ user: { id: user.id, email: user.email, role: user.role, name: user.full_name } });
+        setPermissions(null);
+        if (user.role) fetchUserRole(null, "", user.role);
       }
     });
 
-    const {
-      data: { subscription },
-    } = auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setPermissions(session?.user?.permissions || null);
-      if (session?.user?.role) {
-        fetchUserRole(null, "", session.user.role);
-      } else if (session?.user?.id) {
-        fetchUserRole(session.user.id, session.user.email || "");
+    const unsub = tdpAuth.onAuthStateChange((_event, user) => {
+      if (user) {
+        setSession({ user: { id: user.id, email: user.email, role: user.role, name: user.full_name } });
+        if (user.role) fetchUserRole(null, "", user.role);
       } else {
+        setSession(null);
         setUserRole(null);
       }
     });
@@ -542,7 +537,7 @@ export default function App() {
       setActiveView("attendance_mark");
     }
 
-    return () => subscription.unsubscribe();
+    return () => { if (unsub) unsub(); };
   }, []);
 
   // Close sidebar on mobile when view changes
@@ -553,7 +548,7 @@ export default function App() {
   }, [activeView]);
 
   const handleLogout = async () => {
-    await auth.signOut();
+    await tdpAuth.logout();
   };
 
   const handleToggleSidebar = () => {
