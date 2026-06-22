@@ -207,6 +207,55 @@ app.post("/api/tdp/auth/logout", requireTDPAuth, async (_req, res) => {
 });
 
 // --------------------
+// TDP Admin Exchange Rates
+// --------------------
+
+// GET /api/tdp/exchange-rates/latest
+app.get("/api/tdp/exchange-rates/latest", requireTDPAuth, async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      "SELECT * FROM tdpadmin.exchange_rates ORDER BY rate_date DESC, created_at DESC LIMIT 1"
+    );
+    res.json({ ok: true, rate: rows[0] || null });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/tdp/exchange-rates
+app.get("/api/tdp/exchange-rates", requireTDPAuth, async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 100, 500);
+    const { rows } = await tdpPool.query(
+      "SELECT * FROM tdpadmin.exchange_rates ORDER BY rate_date DESC LIMIT $1", [limit]
+    );
+    res.json({ ok: true, rates: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/exchange-rates
+app.post("/api/tdp/exchange-rates", requireTDPAuth, async (req, res) => {
+  try {
+    const { rate_date, currency, rate, source, notes } = req.body || {};
+    if (!rate_date) return res.status(400).json({ ok: false, error: "rate_date required" });
+    const rateNum = Number(rate);
+    if (!rateNum || rateNum <= 0) return res.status(400).json({ ok: false, error: "rate must be a positive number" });
+    const { rows } = await tdpPool.query(
+      `INSERT INTO tdpadmin.exchange_rates (rate_date, currency, rate, source, notes, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (rate_date, currency) DO UPDATE SET rate = EXCLUDED.rate, source = EXCLUDED.source, notes = EXCLUDED.notes, created_by = EXCLUDED.created_by
+       RETURNING *`,
+      [rate_date, (currency || 'USD').toUpperCase(), rateNum, source || 'manual', notes || '', req.tdpUser.id]
+    );
+    res.json({ ok: true, rate: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// --------------------
 // Admin-only middleware (JWT + role=admin)
 // --------------------
 function requireAdmin(req, res, next) {

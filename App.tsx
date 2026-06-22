@@ -569,7 +569,15 @@ export default function App() {
     if (!rateInput || value <= 0) return;
     setSavingRate(true);
     try {
-      await dbService.saveDailyRate(value);
+      const today = new Date().toISOString().split('T')[0];
+      const token = localStorage.getItem('tdpadmin_auth_token');
+      const res = await fetch(`${import.meta.env.VITE_API_URL || window.location.origin}/api/tdp/exchange-rates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ rate_date: today, rate: value }),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error);
       setIsRateModalOpen(false);
     } catch (e: any) {
       alert("Error al guardar la tasa: " + e.message);
