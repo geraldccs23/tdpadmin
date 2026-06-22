@@ -1491,6 +1491,42 @@ function normalizeQuantity(movementType, qty) {
   return -abs;
 }
 
+// Reusable inventory movement creator
+async function createInventoryMovement(client, { item_type, item_id, movement_type, quantity, unit_cost, warehouse_id, reference_type, reference_id, notes, created_by, allow_negative }) {
+  if (!['ingredient', 'inventory_product'].includes(item_type)) throw new Error("invalid item_type");
+  if (![...ENTRY_TYPES, ...EXIT_TYPES].includes(movement_type)) throw new Error("invalid movement_type");
+
+  let table, stockCol, costCol;
+  if (item_type === 'ingredient') {
+    table = 'public.restaurant_ingredients'; stockCol = 'stock'; costCol = 'cost';
+  } else {
+    table = 'public.restaurant_inventory_products'; stockCol = 'current_stock'; costCol = 'cost';
+  }
+
+  const { rows: itemRows } = await client.query(
+    `SELECT ${stockCol} AS current_stock, ${costCol} AS cost FROM ${table} WHERE id = $1`, [item_id]
+  );
+  if (itemRows.length === 0) throw new Error("item not found");
+  const item = itemRows[0];
+
+  const signedQty = normalizeQuantity(movement_type, quantity);
+  const absQty = Math.abs(signedQty);
+  const newStock = Number(item.current_stock) + signedQty;
+  if (newStock < 0 && !allow_negative) throw new Error(`stock insuficiente: tiene ${Number(item.current_stock).toFixed(2)}, necesita ${absQty.toFixed(2)}`);
+
+  const finalCost = unit_cost !== undefined && unit_cost !== null && unit_cost !== '' ? Number(unit_cost) : (Number(item.cost) || 0);
+  const totalCost = absQty * finalCost;
+
+  const { rows: movRows } = await client.query(
+    `INSERT INTO public.inventory_movements (item_type, item_id, movement_type, quantity, unit_cost, total_cost, reference_type, reference_id, warehouse_id, notes, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+    [item_type, item_id, movement_type, signedQty, finalCost, totalCost, reference_type || null, reference_id || null, warehouse_id || null, notes || null, created_by]
+  );
+
+  await client.query(`UPDATE ${table} SET ${stockCol} = ${stockCol} + $1 WHERE id = $2`, [signedQty, item_id]);
+  return movRows[0];
+}
+
 // GET /api/inventory/movements
 app.get("/api/inventory/movements", requireJwt, async (req, res) => {
   try {
@@ -1520,74 +1556,15 @@ app.post("/api/inventory/movements", requireJwt, async (req, res) => {
   if (!item_type || !item_id || !movement_type) {
     return res.status(400).json({ ok: false, error: "item_type, item_id, movement_type required" });
   }
-  if (!['ingredient', 'inventory_product'].includes(item_type)) {
-    return res.status(400).json({ ok: false, error: "invalid item_type" });
-  }
-  if (![...ENTRY_TYPES, ...EXIT_TYPES].includes(movement_type)) {
-    return res.status(400).json({ ok: false, error: "invalid movement_type" });
-  }
-
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
-    // Verify item exists and get current cost + stock
-    let table, stockCol, costCol, nameCol;
-    if (item_type === 'ingredient') {
-      table = 'public.restaurant_ingredients';
-      stockCol = 'stock';
-      costCol = 'cost';
-      nameCol = 'name';
-    } else {
-      table = 'public.restaurant_inventory_products';
-      stockCol = 'current_stock';
-      costCol = 'cost';
-      nameCol = 'name';
-    }
-
-    const { rows: itemRows } = await client.query(
-      `SELECT ${stockCol} AS current_stock, ${costCol} AS cost, ${nameCol} AS name FROM ${table} WHERE id = $1`,
-      [item_id]
-    );
-    if (itemRows.length === 0) {
-      await client.query("ROLLBACK");
-      return res.status(404).json({ ok: false, error: "item not found" });
-    }
-    const item = itemRows[0];
-
-    // Normalize quantity sign
-    const signedQty = normalizeQuantity(movement_type, quantity);
-    const absQty = Math.abs(signedQty);
-
-    // Check negative stock
-    const newStock = Number(item.current_stock) + signedQty;
-    if (newStock < 0 && !allow_negative) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({
-        ok: false, error: `stock insuficiente: tiene ${Number(item.current_stock).toFixed(2)}, necesita ${absQty.toFixed(2)}`
-      });
-    }
-
-    // Determine unit cost
-    const finalCost = unit_cost !== undefined && unit_cost !== null && unit_cost !== ''
-      ? Number(unit_cost) : (Number(item.cost) || 0);
-    const totalCost = absQty * finalCost;
-
-    // Insert movement
-    const { rows: movRows } = await client.query(
-      `INSERT INTO public.inventory_movements (item_type, item_id, movement_type, quantity, unit_cost, total_cost, reference_type, reference_id, warehouse_id, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [item_type, item_id, movement_type, signedQty, finalCost, totalCost, reference_type || null, reference_id || null, warehouse_id || null, notes || null, req.user.id]
-    );
-
-    // Update stock
-    await client.query(
-      `UPDATE ${table} SET ${stockCol} = ${stockCol} + $1 WHERE id = $2`,
-      [signedQty, item_id]
-    );
-
+    const movement = await createInventoryMovement(client, {
+      item_type, item_id, movement_type, quantity, unit_cost, warehouse_id, reference_type, reference_id, notes, allow_negative,
+      created_by: req.user.id,
+    });
     await client.query("COMMIT");
-    res.json({ ok: true, data: movRows[0] });
+    res.json({ ok: true, data: movement });
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
     res.status(500).json({ ok: false, error: String(e?.message || e) });
@@ -1898,6 +1875,170 @@ app.post("/api/purchases/orders/:id/send", requireJwt, async (req, res) => {
     res.json({ ok: true, data: rows[0] });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// =============================================================================
+// Purchases: Receptions CRUD
+// =============================================================================
+
+// GET /api/purchases/orders/:id/receivable-lines — líneas pendientes de recibir
+app.get("/api/purchases/orders/:id/receivable-lines", requireJwt, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT pol.*, COALESCE(i.name, ip.name) AS item_name,
+        (pol.quantity_ordered - pol.quantity_received) AS pending_qty
+       FROM public.purchase_order_lines pol
+       LEFT JOIN public.restaurant_ingredients i ON pol.item_type = 'ingredient' AND pol.item_id = i.id
+       LEFT JOIN public.restaurant_inventory_products ip ON pol.item_type = 'inventory_product' AND pol.item_id = ip.id
+       WHERE pol.order_id = $1 AND pol.quantity_received < pol.quantity_ordered
+       ORDER BY pol.created_at ASC`, [req.params.id]
+    );
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/purchases/receptions
+app.get("/api/purchases/receptions", requireJwt, async (req, res) => {
+  try {
+    const sql = `SELECT r.*, ps.name AS supplier_name, cw.name AS warehouse_name,
+      po.order_number AS po_number, u.email AS received_by_email
+      FROM public.purchase_receptions r
+      LEFT JOIN public.purchase_suppliers ps ON ps.id = r.supplier_id
+      LEFT JOIN public.company_warehouses cw ON cw.id = r.warehouse_id
+      LEFT JOIN public.purchase_orders po ON po.id = r.order_id
+      LEFT JOIN public.users u ON u.id = r.received_by
+      ORDER BY r.created_at DESC LIMIT 100`;
+    const { rows } = await pool.query(sql);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/purchases/receptions/:id
+app.get("/api/purchases/receptions/:id", requireJwt, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT r.*, ps.name AS supplier_name, cw.name AS warehouse_name, po.order_number AS po_number
+       FROM public.purchase_receptions r
+       LEFT JOIN public.purchase_suppliers ps ON ps.id = r.supplier_id
+       LEFT JOIN public.company_warehouses cw ON cw.id = r.warehouse_id
+       LEFT JOIN public.purchase_orders po ON po.id = r.order_id
+       WHERE r.id = $1`, [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    const { rows: lines } = await pool.query(
+      `SELECT rl.* FROM public.purchase_reception_lines rl WHERE rl.reception_id = $1 ORDER BY rl.created_at ASC`,
+      [req.params.id]
+    );
+    res.json({ ok: true, data: { ...rows[0], lines } });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/purchases/receptions
+app.post("/api/purchases/receptions", requireJwt, async (req, res) => {
+  const { order_id, document_number, warehouse_id, notes, lines } = req.body || {};
+  if (!order_id) return res.status(400).json({ ok: false, error: "order_id required" });
+  if (!Array.isArray(lines) || lines.length === 0) return res.status(400).json({ ok: false, error: "at least one line required" });
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Validate order exists and is receivable
+    const { rows: orderRows } = await client.query(
+      "SELECT id, supplier_id, status FROM public.purchase_orders WHERE id = $1 FOR UPDATE",
+      [order_id]
+    );
+    if (orderRows.length === 0) { await client.query("ROLLBACK"); return res.status(404).json({ ok: false, error: "order not found" }); }
+    const order = orderRows[0];
+    if (!['sent', 'partial'].includes(order.status)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ ok: false, error: `order status ${order.status} cannot receive` });
+    }
+
+    // Validate each line
+    for (const line of lines) {
+      const { rows: pol } = await client.query(
+        "SELECT id, quantity_ordered, quantity_received, item_type, item_id, unit_cost FROM public.purchase_order_lines WHERE id = $1 AND order_id = $2",
+        [line.order_line_id, order_id]
+      );
+      if (pol.length === 0) { await client.query("ROLLBACK"); return res.status(400).json({ ok: false, error: `line ${line.order_line_id} not found in order` }); }
+      const pl = pol[0];
+      const pending = Number(pl.quantity_ordered) - Number(pl.quantity_received);
+      if (Number(line.quantity_received) > pending) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ ok: false, error: `cannot receive more than pending (${pending}) for line ${pl.id}` });
+      }
+    }
+
+    // Create reception
+    const { rows: recRows } = await client.query(
+      `INSERT INTO public.purchase_receptions (order_id, supplier_id, warehouse_id, document_number, notes, received_by)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [order_id, order.supplier_id, warehouse_id || null, document_number || '', notes || '', req.user.id]
+    );
+    const reception = recRows[0];
+
+    // Process each line
+    for (const line of lines) {
+      const { rows: pol } = await client.query(
+        "SELECT item_type, item_id, unit_cost FROM public.purchase_order_lines WHERE id = $1",
+        [line.order_line_id]
+      );
+      const pl = pol[0];
+      const qty = Number(line.quantity_received);
+      const cost = Number(pl.unit_cost);
+      const total = qty * cost;
+
+      // Create inventory movement
+      const movement = await createInventoryMovement(client, {
+        item_type: pl.item_type,
+        item_id: pl.item_id,
+        movement_type: 'compra',
+        quantity: qty,
+        unit_cost: cost,
+        warehouse_id: warehouse_id || null,
+        reference_type: 'purchase_reception',
+        reference_id: reception.id,
+        notes: `Recepción ${reception.reception_number}`,
+        created_by: req.user.id,
+      });
+
+      // Insert reception line
+      await client.query(
+        `INSERT INTO public.purchase_reception_lines (reception_id, order_line_id, item_type, item_id, item_name, quantity_received, unit_cost, total_line, movement_id)
+         VALUES ($1,$2,$3,$4,'',$5,$6,$7,$8)`,
+        [reception.id, line.order_line_id, pl.item_type, pl.item_id, qty, cost, total, movement.id]
+      );
+
+      // Update PO line received qty
+      await client.query(
+        "UPDATE public.purchase_order_lines SET quantity_received = quantity_received + $1 WHERE id = $2",
+        [qty, line.order_line_id]
+      );
+    }
+
+    // Recalculate order status
+    const { rows: remaining } = await client.query(
+      "SELECT COUNT(*) AS pending FROM public.purchase_order_lines WHERE order_id = $1 AND quantity_received < quantity_ordered",
+      [order_id]
+    );
+    const newStatus = Number(remaining[0].pending) > 0 ? 'partial' : 'received';
+    await client.query("UPDATE public.purchase_orders SET status = $1 WHERE id = $2", [newStatus, order_id]);
+
+    await client.query("COMMIT");
+    res.json({ ok: true, data: reception });
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  } finally {
+    client.release();
   }
 });
 
