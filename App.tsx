@@ -28,10 +28,9 @@ import {
   PieChart,
   DollarSign,
   Key,
-  UtensilsCrossed,
-  CookingPot,
-  ScrollText,
   ClipboardList,
+  Briefcase,
+  FileText,
 } from "lucide-react";
 import { dbService } from "./services/dbService";
 import { auth } from "./services/auth";
@@ -86,6 +85,9 @@ import { Ingredients } from "./pages/Ingredients";
 import { Recipes } from "./pages/Recipes";
 import { Users as UsersPage } from "./pages/Users";
 import { InventoryProducts } from "./pages/InventoryProducts";
+import { CrmModule } from "./pages/CrmModule";
+import { ProyectosModule } from "./pages/ProyectosModule";
+import { CotizacionesModule } from "./pages/CotizacionesModule";
 
 type View =
   | "dashboard"
@@ -135,7 +137,10 @@ type View =
   | "ingredients"
   | "recipes"
   | "users"
-  | "inventory_products";
+  | "inventory_products"
+  | "crm"
+  | "proyectos"
+  | "cotizaciones";
 export type Role =
   | "director"
   | "supervisor"
@@ -339,6 +344,9 @@ const rolePermissions: Record<Role, View[]> = {
     "ingredients",
     "recipes",
     "inventory_products",
+    "crm",
+    "proyectos",
+    "cotizaciones",
     "dashboard",
     "inventory",
     "erp_inventory",
@@ -623,13 +631,13 @@ export default function App() {
       >
         <div className="p-4 md:p-6 flex items-center justify-between border-b border-gray-200 min-w-[256px]">
           <div className="flex items-center gap-3">
-            <img src="/ISOTIPOTDP.png" alt="Restaurantes TDP" className="h-10 w-auto" />
+            <img src="/ISOTIPOTDP.png" alt="TDP Admin" className="h-10 w-auto" />
             <div className="flex flex-col">
               <span className="text-lg font-bold tracking-tighter leading-tight">
-                Restaurantes<span className="text-[#009FE3]">TDP</span>
+                TDP<span className="text-[#009FE3]">Admin</span>
               </span>
               <span className="text-[8px] text-gray-500 uppercase tracking-widest font-bold leading-tight">
-                Sistema de Gestión
+                Taller de Píxeles
               </span>
             </div>
           </div>
@@ -642,12 +650,12 @@ export default function App() {
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto min-w-[256px]">
-          {/* ======================= RESTAURANTE ======================= */}
+           {/* ======================= TALLER DE PÍXELES ======================= */}
           <div className="pb-2 mb-2">
             {(isSidebarOpen || window.innerWidth < 768) && (
               <div className="px-4 py-2 bg-[#009FE3]/10 border-l-2 border-[#009FE3] mb-2">
                 <span className="text-[11px] text-[#009FE3] uppercase font-bold tracking-widest">
-                  RESTAURANTES
+                  TALLER DE PÍXELES
                 </span>
               </div>
             )}
@@ -666,21 +674,39 @@ export default function App() {
             userPermissions={permissions}
           />
           <NavItem
-            icon={UtensilsCrossed}
-            label="Menú"
-            view="menu_management"
+            icon={Users}
+            label="CRM"
+            view="crm"
             activeView={activeView}
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
-            allowedRoles={["admin", "supervisor"]}
+            allowedRoles={["admin"]}
             userRole={userRole}
-            perm="menu.view"
-            userPermissions={permissions}
+          />
+          <NavItem
+            icon={Briefcase}
+            label="Proyectos"
+            view="proyectos"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["admin"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={FileText}
+            label="Cotizaciones"
+            view="cotizaciones"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["admin"]}
+            userRole={userRole}
           />
           <NavItem
             icon={ShoppingCart}
-            label="POS / Pedidos"
-            view="pos"
+            label="Ventas"
+            view="sales"
             activeView={activeView}
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
@@ -690,51 +716,15 @@ export default function App() {
             userPermissions={permissions}
           />
           <NavItem
-            icon={ClipboardList}
-            label="Lista Pedidos"
-            view="orders"
-            activeView={activeView}
-            isOpen={isSidebarOpen || window.innerWidth < 768}
-            onClick={handleSetView}
-            allowedRoles={["admin", "cajero", "cocina", "supervisor"]}
-            userRole={userRole}
-            perm="orders.view"
-            userPermissions={permissions}
-          />
-          <NavItem
-            icon={CookingPot}
-            label="Cocina"
-            view="kitchen_panel"
-            activeView={activeView}
-            isOpen={isSidebarOpen || window.innerWidth < 768}
-            onClick={handleSetView}
-            allowedRoles={["admin", "cocina", "supervisor"]}
-            userRole={userRole}
-            perm="kitchen.view"
-            userPermissions={permissions}
-          />
-          <NavItem
-            icon={Package}
-            label="Ingredientes"
-            view="ingredients"
-            activeView={activeView}
-            isOpen={isSidebarOpen || window.innerWidth < 768}
-            onClick={handleSetView}
-            allowedRoles={["admin", "compras", "supervisor", "cocina"]}
-            userRole={userRole}
-            perm="inventory.view"
-            userPermissions={permissions}
-          />
-          <NavItem
-            icon={ScrollText}
-            label="Recetas"
-            view="recipes"
+            icon={Truck}
+            label="Compras"
+            view="purchase_orders"
             activeView={activeView}
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
             allowedRoles={["admin", "compras", "supervisor"]}
             userRole={userRole}
-            perm="recipes.view"
+            perm="inventory.view"
             userPermissions={permissions}
           />
           <NavItem
@@ -750,54 +740,15 @@ export default function App() {
             userPermissions={permissions}
           />
           <NavItem
-            icon={Truck}
-            label="Proveedores"
-            view="suppliers"
+            icon={DollarSign}
+            label="Finanzas"
+            view="income"
             activeView={activeView}
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
-            allowedRoles={["admin", "compras", "supervisor"]}
+            allowedRoles={["admin"]}
             userRole={userRole}
-            perm="inventory.view"
-            userPermissions={permissions}
           />
-          <NavItem
-            icon={ClipboardList}
-            label="Órdenes de Compra"
-            view="purchase_orders"
-            activeView={activeView}
-            isOpen={isSidebarOpen || window.innerWidth < 768}
-            onClick={handleSetView}
-            allowedRoles={["admin", "compras", "supervisor"]}
-            userRole={userRole}
-            perm="inventory.view"
-            userPermissions={permissions}
-          />
-          <NavItem
-            icon={Truck}
-            label="Recepciones"
-            view="purchases"
-            activeView={activeView}
-            isOpen={isSidebarOpen || window.innerWidth < 768}
-            onClick={handleSetView}
-            allowedRoles={["admin", "compras", "supervisor"]}
-            userRole={userRole}
-            perm="inventory.view"
-            userPermissions={permissions}
-          />
-          <NavItem
-            icon={Globe}
-            label="Menú Público"
-            view="public_menu"
-            activeView={activeView}
-            isOpen={isSidebarOpen || window.innerWidth < 768}
-            onClick={handleSetView}
-            allowedRoles={["admin", "supervisor"]}
-            userRole={userRole}
-            perm="menu.view"
-            userPermissions={permissions}
-          />
-
           <NavItem
             icon={MessageSquare}
             label="Soporte"
@@ -1557,11 +1508,17 @@ export default function App() {
                                                                        ? "Usuarios"
                                                                        : activeView === "inventory_products"
                                                                        ? "Inventario"
+                                                                       : activeView === "crm"
+                                                                       ? "CRM"
+                                                                       : activeView === "proyectos"
+                                                                       ? "Proyectos"
+                                                                       : activeView === "cotizaciones"
+                                                                       ? "Cotizaciones"
                                                                        : activeView}
               </h1>
               <div className="h-4 w-px bg-gray-200 hidden sm:block"></div>
               <span className="text-[10px] md:text-xs text-gray-400 font-medium hidden sm:block">
-                Restaurantes TDP
+                TDP Admin
               </span>
             </div>
           </div>
@@ -1658,6 +1615,9 @@ export default function App() {
               {activeView === "recipes" && <Recipes />}
               {activeView === "users" && <UsersPage />}
               {activeView === "inventory_products" && <InventoryProducts />}
+              {activeView === "crm" && <CrmModule />}
+              {activeView === "proyectos" && <ProyectosModule />}
+              {activeView === "cotizaciones" && <CotizacionesModule />}
             </>
           )}
         </div>

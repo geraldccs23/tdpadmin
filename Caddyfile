@@ -1,4 +1,4 @@
-# restaurantdp — Caddy reverse proxy configuration
+# tdpadmin — Caddy reverse proxy configuration
 # Replace tudominio.com with your actual domain
 
 tudominio.com {

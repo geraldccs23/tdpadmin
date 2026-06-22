@@ -1,5 +1,5 @@
 # =============================================================================
-# restaurantdp — Docker Compose (VPS TDP)
+# tdpadmin — Docker Compose (VPS TDP)
 # Solo backend + frontend.
 # postgres, redis, minio, caddy son servicios globales existentes.
 # Red externa: tdp_proxy
@@ -11,7 +11,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.server
-    container_name: restaurantdp-backend
+    container_name: tdpadmin-backend
     restart: unless-stopped
     env_file: .env
     expose:
@@ -23,7 +23,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: restaurantdp-frontend
+    container_name: tdpadmin-frontend
     restart: unless-stopped
     expose:
       - "80"

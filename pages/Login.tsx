@@ -29,11 +29,11 @@ export function Login() {
                 <div className="bg-white rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.08)] overflow-hidden">
                     <div className="p-10 pb-0 text-center">
                         <div className="flex justify-center mb-6">
-                            <img src="/ISOTIPOTDP.png" alt="Restaurantes TDP" className="h-14 w-auto" />
+                            <img src="/ISOTIPOTDP.png" alt="TDP Admin" className="h-14 w-auto" />
                         </div>
-                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight mb-1">RestaurantDP</h1>
-                        <p className="text-sm text-gray-500">Plataforma de gestión para restaurantes</p>
-                        <p className="text-[11px] text-gray-400 mt-1">desarrollada por Taller de Píxeles</p>
+                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight mb-1">TDP Admin</h1>
+                        <p className="text-sm text-gray-500">Sistema administrativo interno</p>
+                        <p className="text-[11px] text-gray-400 mt-1">Taller de Píxeles</p>
                     </div>
 
                     <form onSubmit={handleLogin} className="p-10 pt-8 space-y-5">
@@ -94,7 +94,7 @@ export function Login() {
 
                     <div className="px-10 py-4 bg-gray-50 border-t border-gray-100 text-center">
                         <p className="text-[10px] text-gray-400">
-                            RestaurantDP © {new Date().getFullYear()} — Taller de Píxeles C.A.
+                            TDP Admin © {new Date().getFullYear()} — Taller de Píxeles C.A.
                         </p>
                     </div>
                 </div>
