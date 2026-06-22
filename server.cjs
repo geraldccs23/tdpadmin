@@ -149,7 +149,7 @@ app.post("/api/tdp/auth/register", async (req, res) => {
     const { email, password, full_name, role } = req.body || {};
     if (!email || !password) return res.status(400).json({ ok: false, error: "email and password required" });
     const hash = bcrypt.hashSync(password, 10);
-    const { rows } = await pool.query(
+    const { rows } = await tdpPool.query(
       `INSERT INTO tdpadmin.users (email, password_hash, full_name, role) VALUES ($1, $2, $3, $4)
        RETURNING id, email, full_name, role, status, created_at`,
       [email.trim().toLowerCase(), hash, full_name || '', role || 'staff']
@@ -168,7 +168,7 @@ app.post("/api/tdp/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ ok: false, error: "email and password required" });
-    const { rows } = await pool.query(
+    const { rows } = await tdpPool.query(
       "SELECT id, email, password_hash, full_name, role, status FROM tdpadmin.users WHERE email = $1 LIMIT 1",
       [email.trim().toLowerCase()]
     );
@@ -176,7 +176,7 @@ app.post("/api/tdp/auth/login", async (req, res) => {
     const user = rows[0];
     if (user.status !== 'active') return res.status(401).json({ ok: false, error: "account is not active" });
     if (!bcrypt.compareSync(password, user.password_hash)) return res.status(401).json({ ok: false, error: "invalid credentials" });
-    await pool.query("UPDATE tdpadmin.users SET last_login_at = NOW() WHERE id = $1", [user.id]);
+    await tdpPool.query("UPDATE tdpadmin.users SET last_login_at = NOW() WHERE id = $1", [user.id]);
     const token = generateTDPToken(user);
     res.json({
       ok: true, token,
@@ -190,7 +190,7 @@ app.post("/api/tdp/auth/login", async (req, res) => {
 // GET /api/tdp/auth/me
 app.get("/api/tdp/auth/me", requireTDPAuth, async (req, res) => {
   try {
-    const { rows } = await pool.query(
+    const { rows } = await tdpPool.query(
       "SELECT id, email, full_name, role, status, last_login_at, created_at FROM tdpadmin.users WHERE id = $1",
       [req.tdpUser.id]
     );
@@ -390,7 +390,7 @@ function requireAuth(req, res, next) {
 }
 
 // --------------------
-// PG Pool
+// PG Pool (tdp_main — restaurant data)
 // --------------------
 const pool = new Pool({
     host: process.env.PGHOST,
@@ -402,6 +402,13 @@ const pool = new Pool({
     idleTimeoutMillis: Number(process.env.PGPOOL_IDLE || 30000),
     connectionTimeoutMillis: Number(process.env.PGPOOL_CONN_TIMEOUT || 10000),
 });
+
+// --------------------
+// TDP Pool (tdpadmin — TDP Admin data)
+// --------------------
+const tdpPool = process.env.DATABASE_URL
+  ? new Pool({ connectionString: process.env.DATABASE_URL, max: 5 })
+  : pool;
 
 // --------------------
 // Ping
