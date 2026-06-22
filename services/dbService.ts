@@ -2,6 +2,17 @@ import { supabase } from './supabase';
 import { api } from './apiClient';
 import { Product, Supplier, PurchaseLine, SalesLine, SyncLog, Seller, Courier, CasheaInstallment, BankTransfer, SupportTicket, Delivery, DeliveryStatus, PaymentStatus, AccountPayable, PayablePayment, BankAccount, DeliveryZone } from '../types';
 
+const TDP_API_URL = import.meta.env.VITE_API_URL || window.location.origin;
+
+async function tdpApi(path: string, opts?: RequestInit) {
+  const token = localStorage.getItem('tdpadmin_auth_token');
+  const res = await fetch(`${TDP_API_URL}${path}`, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts?.headers },
+  });
+  return res.json();
+}
+
 function toLocalDateStr(date: Date): string {
   return date.getFullYear() + '-' +
     String(date.getMonth() + 1).padStart(2, '0') + '-' +
@@ -1025,20 +1036,18 @@ export const dbService = {
     }));
   },
 
-  // Get Latest Exchange Rate: manual rate (daily_rates) > API > fallback
+  // Get Latest Exchange Rate: manual rate (TDP API) > API > fallback
   async getLatestExchangeRate(): Promise<number> {
     const today = new Date();
     const day = today.getDay();
-    const localizedDate = new Date(today.getTime() - (today.getTimezoneOffset() * 60000));
-    const yyyymmdd = localizedDate.toISOString().split('T')[0];
 
     // 1) Manual rate set by director always takes priority
     try {
-      const { data } = await supabase.from('daily_rates').select('rate').eq('date', yyyymmdd).single();
-      if (data && data.rate) {
-        return Number(data.rate);
+      const json = await tdpApi('/api/tdp/exchange-rates/latest');
+      if (json.ok && json.rate && json.rate.rate) {
+        return Number(json.rate.rate);
       }
-    } catch (e) { /* no row or error → continue */ }
+    } catch (e) { /* no rate → continue */ }
 
     // 2) Saturday / Monday with no manual rate → signal frontend to prompt
     if (day === 6 || day === 1) {
@@ -1702,18 +1711,12 @@ export const dbService = {
   },
 
   async saveDailyRate(rate: number): Promise<void> {
-    const today = new Date();
-    const localizedDate = new Date(today.getTime() - (today.getTimezoneOffset() * 60000));
-    const yyyymmdd = localizedDate.toISOString().split('T')[0];
-    const { data: { session } } = await supabase.auth.getSession();
-
-    const { error } = await supabase.from('daily_rates').upsert({
-      date: yyyymmdd,
-      rate: rate,
-      set_by: session?.user?.id
-    }, { onConflict: 'date' });
-
-    if (error) throw error;
+    const today = new Date().toISOString().split('T')[0];
+    const json = await tdpApi('/api/tdp/exchange-rates', {
+      method: 'POST',
+      body: JSON.stringify({ rate_date: today, rate, currency: 'USD', source: 'manual', notes: 'Manual rate' }),
+    });
+    if (!json.ok) throw new Error(json.error || 'Error saving rate');
   },
 
 
