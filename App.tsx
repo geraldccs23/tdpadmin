@@ -89,6 +89,7 @@ import { InventoryProducts } from "./pages/InventoryProducts";
 import { CrmModule } from "./pages/CrmModule";
 import { ProyectosModule } from "./pages/ProyectosModule";
 import { CotizacionesModule } from "./pages/CotizacionesModule";
+import { SupportModule } from "./pages/SupportModule";
 
 type View =
   | "dashboard"
@@ -141,7 +142,8 @@ type View =
   | "inventory_products"
   | "crm"
   | "proyectos"
-  | "cotizaciones";
+  | "cotizaciones"
+  | "support_tdp";
 export type Role =
   | "director"
   | "supervisor"
@@ -156,7 +158,13 @@ export type Role =
   | "supervisor_almacen"
   | "almacenista"
   | "admin"
-  | "cocina";
+  | "cocina"
+  | "superadmin"
+  | "support"
+  | "sales"
+  | "staff"
+  | "finance"
+  | "client";
 
 const rolePermissions: Record<Role, View[]> = {
   director: [
@@ -348,6 +356,7 @@ const rolePermissions: Record<Role, View[]> = {
     "crm",
     "proyectos",
     "cotizaciones",
+    "support_tdp",
     "dashboard",
     "inventory",
     "erp_inventory",
@@ -396,6 +405,9 @@ const rolePermissions: Record<Role, View[]> = {
     "dashboard_restaurant",
     "support",
   ],
+  client: [
+    "support_tdp",
+  ],
 };
 
 const defaultViews: Record<Role, View> = {
@@ -413,6 +425,7 @@ const defaultViews: Record<Role, View> = {
   almacenista: "warehouse",
   admin: "dashboard_restaurant",
   cocina: "kitchen_panel",
+  client: "support_tdp",
 };
 
 interface NavItemProps {
@@ -466,7 +479,7 @@ export default function App() {
   const [savingRate, setSavingRate] = useState(false);
 
   const fetchUserRole = async (userId: string | null, email: string, presetRole?: string) => {
-    if (presetRole && ['director','supervisor','supervisor_ventas','supervisor_compras','administrador','cajero','vendedor','compras','soporte','delivery','supervisor_almacen','almacenista','admin','cocina'].includes(presetRole)) {
+    if (presetRole && ['director','supervisor','supervisor_ventas','supervisor_compras','administrador','cajero','vendedor','compras','soporte','delivery','supervisor_almacen','almacenista','admin','cocina','superadmin','support','sales','staff','finance','client'].includes(presetRole)) {
       setUserRole(presetRole as Role);
       return;
     }
@@ -755,14 +768,12 @@ export default function App() {
           <NavItem
             icon={MessageSquare}
             label="Soporte"
-            view="support"
+            view="support_tdp"
             activeView={activeView}
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
-            allowedRoles={["admin", "manager", "cashier", "soporte", "cocina", "waiter"]}
+            allowedRoles={["superadmin", "admin", "support", "sales", "staff", "finance", "client"]}
             userRole={userRole}
-            perm="support.view"
-            userPermissions={permissions}
           />
 
           {userRole === "admin" && (
@@ -1517,6 +1528,8 @@ export default function App() {
                                                                        ? "Proyectos"
                                                                        : activeView === "cotizaciones"
                                                                        ? "Cotizaciones"
+                                                                       : activeView === "support_tdp"
+                                                                       ? "Soporte"
                                                                        : activeView}
               </h1>
               <div className="h-4 w-px bg-gray-200 hidden sm:block"></div>
@@ -1621,6 +1634,7 @@ export default function App() {
               {activeView === "crm" && <CrmModule />}
               {activeView === "proyectos" && <ProyectosModule />}
               {activeView === "cotizaciones" && <CotizacionesModule />}
+              {activeView === "support_tdp" && <SupportModule userRole={userRole || ''} />}
             </>
           )}
         </div>

@@ -256,6 +256,201 @@ app.post("/api/tdp/exchange-rates", requireTDPAuth, async (req, res) => {
 });
 
 // --------------------
+// TDP Admin Support
+// --------------------
+
+function isInternalRole(role) {
+  return ['superadmin', 'admin', 'support'].includes(role);
+}
+
+// GET /api/tdp/support/tickets
+app.get("/api/tdp/support/tickets", requireTDPAuth, async (req, res) => {
+  try {
+    const isInternal = isInternalRole(req.tdpUser.role);
+    let sql = `SELECT t.*, c.name AS client_name, 
+      u_assigned.email AS assigned_email, u_creator.email AS created_by_email
+      FROM tdpadmin.support_tickets t
+      LEFT JOIN tdpadmin.clients c ON c.id = t.client_id
+      LEFT JOIN tdpadmin.users u_assigned ON u_assigned.id = t.assigned_to
+      LEFT JOIN tdpadmin.users u_creator ON u_creator.id = t.created_by
+      WHERE 1=1`;
+    const params = [];
+
+    if (!isInternal) {
+      params.push(req.tdpUser.client_id);
+      sql += ` AND t.client_id = $${params.length}`;
+    }
+
+    for (const key of ['status', 'priority', 'client_id', 'assigned_to']) {
+      if (req.query[key]) { params.push(req.query[key]); sql += ` AND t.${key} = $${params.length}`; }
+    }
+
+    if (req.query.search) {
+      params.push(`%${req.query.search}%`);
+      sql += ` AND (t.title ILIKE $${params.length} OR t.ticket_number ILIKE $${params.length})`;
+    }
+
+    sql += " ORDER BY t.created_at DESC LIMIT 100";
+    const { rows } = await tdpPool.query(sql, params);
+    res.json({ ok: true, tickets: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/support/tickets
+app.post("/api/tdp/support/tickets", requireTDPAuth, async (req, res) => {
+  try {
+    const { client_id, project_id, title, description, priority, category } = req.body || {};
+    if (!title) return res.status(400).json({ ok: false, error: "title required" });
+
+    let targetClientId = client_id;
+    if (req.tdpUser.role === 'client') {
+      targetClientId = req.tdpUser.client_id;
+    }
+    if (!targetClientId) return res.status(400).json({ ok: false, error: "client_id required" });
+
+    const { rows } = await tdpPool.query(
+      `INSERT INTO tdpadmin.support_tickets (client_id, project_id, title, description, priority, category, source, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,'portal',$7) RETURNING *`,
+      [targetClientId, project_id || null, title, description || '', priority || 'normal', category || 'general', req.tdpUser.id]
+    );
+    res.json({ ok: true, ticket: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/tdp/support/tickets/:id
+app.get("/api/tdp/support/tickets/:id", requireTDPAuth, async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      `SELECT t.*, c.name AS client_name, c.email AS client_email,
+        u_assigned.email AS assigned_email, u_creator.email AS created_by_email
+       FROM tdpadmin.support_tickets t
+       LEFT JOIN tdpadmin.clients c ON c.id = t.client_id
+       LEFT JOIN tdpadmin.users u_assigned ON u_assigned.id = t.assigned_to
+       LEFT JOIN tdpadmin.users u_creator ON u_creator.id = t.created_by
+       WHERE t.id = $1`, [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "ticket not found" });
+    const ticket = rows[0];
+
+    // Client can only see own tickets
+    if (req.tdpUser.role === 'client' && ticket.client_id !== req.tdpUser.client_id) {
+      return res.status(403).json({ ok: false, error: "forbidden" });
+    }
+
+    // Messages: client cannot see is_internal
+    let msgSql = "SELECT * FROM tdpadmin.support_ticket_messages WHERE ticket_id = $1";
+    if (req.tdpUser.role === 'client') msgSql += " AND is_internal = false";
+    msgSql += " ORDER BY created_at ASC";
+    const { rows: messages } = await tdpPool.query(msgSql, [req.params.id]);
+
+    res.json({ ok: true, ticket: { ...ticket, messages } });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/tdp/support/tickets/:id
+app.patch("/api/tdp/support/tickets/:id", requireTDPAuth, async (req, res) => {
+  try {
+    const isInternal = isInternalRole(req.tdpUser.role);
+    const allowedFields = isInternal
+      ? ['status', 'priority', 'assigned_to', 'category', 'project_id', 'title', 'description']
+      : ['title', 'description'];
+
+    const sets = []; const params = []; let idx = 0;
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) { idx++; sets.push(`${key} = $${idx}`); params.push(req.body[key]); }
+    }
+    if (req.body.status === 'closed' || req.body.status === 'resolved') {
+      idx++; sets.push(`closed_at = $${idx}`); params.push(new Date().toISOString());
+    }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no valid fields" });
+
+    idx++; params.push(req.params.id);
+    const { rows } = await tdpPool.query(
+      `UPDATE tdpadmin.support_tickets SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`, params
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, ticket: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/support/tickets/:id/messages
+app.post("/api/tdp/support/tickets/:id/messages", requireTDPAuth, async (req, res) => {
+  try {
+    const { message, is_internal } = req.body || {};
+    if (!message) return res.status(400).json({ ok: false, error: "message required" });
+
+    // Verify ticket access
+    const { rows: ticketRows } = await tdpPool.query(
+      "SELECT id, client_id, status FROM tdpadmin.support_tickets WHERE id = $1", [req.params.id]
+    );
+    if (ticketRows.length === 0) return res.status(404).json({ ok: false, error: "ticket not found" });
+    const ticket = ticketRows[0];
+    if (req.tdpUser.role === 'client' && ticket.client_id !== req.tdpUser.client_id) {
+      return res.status(403).json({ ok: false, error: "forbidden" });
+    }
+
+    const canInternal = isInternalRole(req.tdpUser.role);
+    const internalFlag = canInternal ? (is_internal === true) : false;
+    const authorType = req.tdpUser.role === 'client' ? 'client' : 'internal';
+
+    const { rows } = await tdpPool.query(
+      `INSERT INTO tdpadmin.support_ticket_messages (ticket_id, author_id, author_type, message, is_internal)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [req.params.id, req.tdpUser.id, authorType, message, internalFlag]
+    );
+
+    // Auto-update status based on who replied
+    if (req.tdpUser.role === 'client' && ticket.status === 'waiting_client') {
+      await tdpPool.query("UPDATE tdpadmin.support_tickets SET status = 'open' WHERE id = $1", [req.params.id]);
+    } else if (authorType === 'internal' && ticket.status === 'open') {
+      await tdpPool.query("UPDATE tdpadmin.support_tickets SET status = 'in_progress' WHERE id = $1", [req.params.id]);
+    }
+
+    res.json({ ok: true, message: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/clients/:clientId/users — create client user
+app.post("/api/tdp/clients/:clientId/users", requireTDPAuth, async (req, res) => {
+  if (!isInternalRole(req.tdpUser.role)) return res.status(403).json({ ok: false, error: "forbidden" });
+  try {
+    const { email, password, full_name } = req.body || {};
+    if (!email || !password) return res.status(400).json({ ok: false, error: "email and password required" });
+    const hash = bcrypt.hashSync(password, 10);
+    const { rows } = await tdpPool.query(
+      `INSERT INTO tdpadmin.users (email, password_hash, full_name, role, client_id)
+       VALUES ($1,$2,$3,'client',$4) RETURNING id, email, full_name, role, client_id, created_at`,
+      [email.trim().toLowerCase(), hash, full_name || email, req.params.clientId]
+    );
+    res.json({ ok: true, user: rows[0] });
+  } catch (e) {
+    const msg = e?.constraint === 'tdpadmin_users_email_key' ? 'email already exists' : String(e?.message || e);
+    res.status(400).json({ ok: false, error: msg });
+  }
+});
+
+// GET /api/tdp/clients — list clients for internal users
+app.get("/api/tdp/clients", requireTDPAuth, async (req, res) => {
+  if (!isInternalRole(req.tdpUser.role)) return res.status(403).json({ ok: false, error: "forbidden" });
+  try {
+    const { rows } = await tdpPool.query("SELECT id, name, email, phone, status FROM tdpadmin.clients ORDER BY name ASC");
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// --------------------
 // Admin-only middleware (JWT + role=admin)
 // --------------------
 function requireAdmin(req, res, next) {
