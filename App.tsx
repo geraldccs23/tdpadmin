@@ -408,6 +408,29 @@ const rolePermissions: Record<Role, View[]> = {
   client: [
     "support_tdp",
   ],
+  superadmin: [
+    "support_tdp",
+    "dashboard_restaurant",
+    "crm",
+    "proyectos",
+    "cotizaciones",
+    "settings",
+    "users",
+  ],
+  support: [
+    "support_tdp",
+  ],
+  sales: [
+    "support_tdp",
+    "crm",
+    "cotizaciones",
+  ],
+  staff: [
+    "support_tdp",
+  ],
+  finance: [
+    "support_tdp",
+  ],
 };
 
 const defaultViews: Record<Role, View> = {
@@ -426,6 +449,11 @@ const defaultViews: Record<Role, View> = {
   admin: "dashboard_restaurant",
   cocina: "kitchen_panel",
   client: "support_tdp",
+  superadmin: "dashboard_restaurant",
+  support: "support_tdp",
+  sales: "support_tdp",
+  staff: "support_tdp",
+  finance: "support_tdp",
 };
 
 interface NavItemProps {
@@ -684,7 +712,7 @@ export default function App() {
             activeView={activeView}
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
-            allowedRoles={["admin", "supervisor", "cocina", "cajero", "compras"]}
+            allowedRoles={["superadmin", "admin", "supervisor", "cocina", "cajero", "compras"]}
             userRole={userRole}
             perm="dashboard.view"
             userPermissions={permissions}
