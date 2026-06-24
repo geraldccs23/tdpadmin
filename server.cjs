@@ -3148,8 +3148,8 @@ app.get("/api/p/quotes/:id", async (req, res) => {
   }
 });
 
-// GET /p/:id — public quote page
-app.get("/p/:id", async (req, res) => {
+// GET /api/p/view/:id — public quote page (HTML)
+app.get("/p/view/:id", async (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="es">
 <head>

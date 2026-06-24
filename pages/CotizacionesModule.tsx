@@ -33,7 +33,7 @@ export function CotizacionesModule() {
   const [copied, setCopied] = useState(false);
 
   const copyLink = (id: string) => {
-    const link = `${window.location.origin}/p/${id}`;
+    const link = `${window.location.origin}/api/p/view/${id}`;
     navigator.clipboard.writeText(link).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
