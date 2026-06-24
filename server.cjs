@@ -451,6 +451,303 @@ app.get("/api/tdp/clients", requireTDPAuth, async (req, res) => {
 });
 
 // --------------------
+// TDP CRM
+// --------------------
+
+function requireCRMAccess(req, res, next) {
+  if (!['superadmin', 'admin', 'sales', 'support', 'staff'].includes(req.tdpUser.role)) {
+    return res.status(403).json({ ok: false, error: "forbidden" });
+  }
+  next();
+}
+
+// GET /api/tdp/crm/clients
+app.get("/api/tdp/crm/clients", requireTDPAuth, requireCRMAccess, async (req, res) => {
+  try {
+    let sql = `SELECT c.*, u.email AS assigned_email
+      FROM tdpadmin.clients c
+      LEFT JOIN tdpadmin.users u ON u.id = c.assigned_to
+      WHERE 1=1`;
+    const params = [];
+    for (const key of ['kind', 'status', 'assigned_to', 'source']) {
+      if (req.query[key]) { params.push(req.query[key]); sql += ` AND c.${key} = $${params.length}`; }
+    }
+    if (req.query.search) {
+      params.push(`%${req.query.search}%`);
+      sql += ` AND (c.name ILIKE $${params.length} OR c.email ILIKE $${params.length} OR c.phone ILIKE $${params.length} OR c.company_name ILIKE $${params.length})`;
+    }
+    sql += " ORDER BY c.updated_at DESC LIMIT 200";
+    const { rows } = await tdpPool.query(sql, params);
+    res.json({ ok: true, clients: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/tdp/crm/clients/:id
+app.get("/api/tdp/crm/clients/:id", requireTDPAuth, async (req, res) => {
+  if (req.tdpUser.role === 'client') return res.status(403).json({ ok: false, error: "forbidden" });
+  try {
+    const { rows } = await tdpPool.query("SELECT * FROM tdpadmin.clients WHERE id = $1", [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, client: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/crm/clients
+app.post("/api/tdp/crm/clients", requireTDPAuth, requireCRMAccess, async (req, res) => {
+  try {
+    const { name, email, phone, kind, status, source, interest, estimated_budget, assigned_to, company_name, contact_name, whatsapp, city, notes } = req.body || {};
+    if (!name) return res.status(400).json({ ok: false, error: "name required" });
+    const { rows } = await tdpPool.query(
+      `INSERT INTO tdpadmin.clients (name, email, phone, kind, status, source, interest, estimated_budget, assigned_to, company_name, contact_name, whatsapp, city, notes, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      [name, email || '', phone || '', kind || 'prospect', status || 'lead', source || 'otro', interest || '', estimated_budget || null, assigned_to || req.tdpUser.id, company_name || '', contact_name || '', whatsapp || '', city || '', notes || '', req.tdpUser.id]
+    );
+    res.json({ ok: true, client: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/tdp/crm/clients/:id
+app.patch("/api/tdp/crm/clients/:id", requireTDPAuth, requireCRMAccess, async (req, res) => {
+  try {
+    const sets = []; const params = []; let idx = 0;
+    const allowed = ['name','email','phone','whatsapp','instagram','kind','status','source','interest','estimated_budget','assigned_to','company_name','contact_name','position','country','city','address','website','next_follow_up','lost_reason','tags','notes'];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) { idx++; sets.push(`${key} = $${idx}`); params.push(req.body[key]); }
+    }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields" });
+    idx++; params.push(req.params.id);
+    const { rows } = await tdpPool.query(
+      `UPDATE tdpadmin.clients SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`, params
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, client: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// DELETE /api/tdp/crm/clients/:id — soft delete
+app.delete("/api/tdp/crm/clients/:id", requireTDPAuth, requireCRMAccess, async (req, res) => {
+  try {
+    const { rowCount } = await tdpPool.query(
+      "UPDATE tdpadmin.clients SET status = 'inactive' WHERE id = $1 AND status != 'inactive'", [req.params.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// --------------------
+// TDP Quotes
+// --------------------
+
+// GET /api/tdp/quotes
+app.get("/api/tdp/quotes", requireTDPAuth, async (req, res) => {
+  try {
+    let sql = `SELECT q.*, c.name AS client_name
+      FROM tdpadmin.quotes q
+      LEFT JOIN tdpadmin.clients c ON c.id = q.client_id
+      WHERE 1=1`;
+    const params = [];
+    for (const key of ['status', 'client_id']) {
+      if (req.query[key]) { params.push(req.query[key]); sql += ` AND q.${key} = $${params.length}`; }
+    }
+    if (req.query.search) {
+      params.push(`%${req.query.search}%`);
+      sql += ` AND (q.quote_number ILIKE $${params.length} OR q.title ILIKE $${params.length})`;
+    }
+    if (req.tdpUser.role === 'client') {
+      params.push(req.tdpUser.client_id);
+      sql += ` AND q.client_id = $${params.length}`;
+    }
+    sql += " ORDER BY q.created_at DESC LIMIT 100";
+    const { rows } = await tdpPool.query(sql, params);
+    res.json({ ok: true, quotes: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/tdp/quotes/:id
+app.get("/api/tdp/quotes/:id", requireTDPAuth, async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      `SELECT q.*, c.name AS client_name, c.email AS client_email, c.phone AS client_phone
+       FROM tdpadmin.quotes q
+       LEFT JOIN tdpadmin.clients c ON c.id = q.client_id
+       WHERE q.id = $1`, [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    const { rows: items } = await tdpPool.query(
+      "SELECT * FROM tdpadmin.quote_items WHERE quote_id = $1 ORDER BY display_order ASC, created_at ASC",
+      [req.params.id]
+    );
+    res.json({ ok: true, quote: { ...rows[0], items } });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+function calcQuoteTotals(items) {
+  const subtotal = (items || []).reduce((s, it) => s + Number(it.quantity || 1) * Number(it.unit_price || 0), 0);
+  return { subtotal };
+}
+
+// POST /api/tdp/quotes
+app.post("/api/tdp/quotes", requireTDPAuth, async (req, res) => {
+  try {
+    const { client_id, project_id, title, currency, exchange_rate, discount, notes, terms, valid_until, items } = req.body || {};
+    if (!client_id) return res.status(400).json({ ok: false, error: "client_id required" });
+
+    const { subtotal } = calcQuoteTotals(items);
+    const disc = Number(discount || 0);
+    const total = subtotal - disc;
+
+    const client = await tdpPool.connect();
+    try {
+      await client.query("BEGIN");
+      // Generate number manually since default may already be consumed
+      const { rows: [seq] } = await client.query("SELECT nextval('tdpadmin.seq_quote_number_v2') AS num");
+      const num = String(seq.num).padStart(5, '0');
+      const yymm = new Date().toISOString().slice(0, 7).replace('-', '');
+      const quoteNumber = `PRE-${yymm}-${num}`;
+
+      const { rows: quoteRows } = await client.query(
+        `INSERT INTO tdpadmin.quotes (quote_number, client_id, project_id, title, currency, exchange_rate, subtotal, discount, total, notes, terms, valid_until, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+        [quoteNumber, client_id, project_id || null, title || '', currency || 'USD', exchange_rate || null, subtotal, disc, total, notes || '', terms || '', valid_until || null, req.tdpUser.id]
+      );
+
+      if (Array.isArray(items)) {
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i];
+          const totalLine = (Number(it.quantity) || 1) * (Number(it.unit_price) || 0);
+          await client.query(
+            `INSERT INTO tdpadmin.quote_items (quote_id, item_type, description, quantity, unit_price, total_price, display_order)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            [quoteRows[0].id, it.item_type || 'service', it.description || '', Number(it.quantity) || 1, Number(it.unit_price) || 0, totalLine, i]
+          );
+        }
+      }
+
+      await client.query("COMMIT");
+      const { rows: full } = await tdpPool.query(
+        "SELECT * FROM tdpadmin.quotes WHERE id = $1", [quoteRows[0].id]
+      );
+      res.json({ ok: true, quote: full[0] });
+    } catch (e) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/tdp/quotes/:id
+app.patch("/api/tdp/quotes/:id", requireTDPAuth, async (req, res) => {
+  try {
+    const { items, ...fields } = req.body;
+    const client = await tdpPool.connect();
+    try {
+      await client.query("BEGIN");
+      // Update header fields
+      const fieldKeys = Object.keys(fields).filter(k => ['title','client_id','project_id','currency','exchange_rate','discount','notes','terms','valid_until','status'].includes(k));
+      if (fieldKeys.length > 0) {
+        const sets = []; const params = []; let idx = 0;
+        for (const key of fieldKeys) {
+          idx++; sets.push(`${key} = $${idx}`); params.push(fields[key]);
+        }
+        params.push(req.params.id);
+        await client.query(`UPDATE tdpadmin.quotes SET ${sets.join(', ')} WHERE id = $${idx + 1}`, params);
+      }
+      // Replace items
+      if (Array.isArray(items)) {
+        await client.query("DELETE FROM tdpadmin.quote_items WHERE quote_id = $1", [req.params.id]);
+        let subtotal = 0;
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i];
+          const totalLine = (Number(it.quantity) || 1) * (Number(it.unit_price) || 0);
+          subtotal += totalLine;
+          await client.query(
+            `INSERT INTO tdpadmin.quote_items (quote_id, item_type, description, quantity, unit_price, total_price, display_order)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            [req.params.id, it.item_type || 'service', it.description || '', Number(it.quantity) || 1, Number(it.unit_price) || 0, totalLine, i]
+          );
+        }
+        const disc = Number(fields.discount || req.body.discount || 0);
+        await client.query("UPDATE tdpadmin.quotes SET subtotal = $1, total = $2 WHERE id = $3", [subtotal, subtotal - disc, req.params.id]);
+      }
+      // Handle status changes
+      if (fields.status === 'approved') {
+        await client.query("UPDATE tdpadmin.quotes SET approved_at = NOW() WHERE id = $1", [req.params.id]);
+      }
+      await client.query("COMMIT");
+      const { rows } = await tdpPool.query("SELECT * FROM tdpadmin.quotes WHERE id = $1", [req.params.id]);
+      res.json({ ok: true, quote: rows[0] });
+    } catch (e) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/quotes/:id/send
+app.post("/api/tdp/quotes/:id/send", requireTDPAuth, async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      "UPDATE tdpadmin.quotes SET status = 'sent' WHERE id = $1 AND status = 'draft' RETURNING *", [req.params.id]
+    );
+    if (rows.length === 0) return res.status(400).json({ ok: false, error: "quote not found or not in draft" });
+    res.json({ ok: true, quote: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/quotes/:id/approve
+app.post("/api/tdp/quotes/:id/approve", requireTDPAuth, async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      "UPDATE tdpadmin.quotes SET status = 'approved', approved_at = NOW() WHERE id = $1 AND status = 'sent' RETURNING *",
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(400).json({ ok: false, error: "quote not found or not sent" });
+    res.json({ ok: true, quote: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/quotes/:id/reject
+app.post("/api/tdp/quotes/:id/reject", requireTDPAuth, async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      "UPDATE tdpadmin.quotes SET status = 'rejected' WHERE id = $1 AND status IN ('draft','sent') RETURNING *",
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(400).json({ ok: false, error: "quote not found" });
+    res.json({ ok: true, quote: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// --------------------
 // Admin-only middleware (JWT + role=admin)
 // --------------------
 function requireAdmin(req, res, next) {
