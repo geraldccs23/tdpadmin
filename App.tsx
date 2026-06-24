@@ -1616,7 +1616,6 @@ export default function App() {
               {activeView === "internal_transfers" && <InternalTransfers />}
               {activeView === "purchase_orders" && <PurchaseOrders />}
               {activeView === "cashier_closing" && <CashierClosing />}
-              {activeView === "crm" && <WAChat />}
               {activeView === "support" && <Support />}
               {activeView === "commissions" && <Commissions />}
               {activeView === "delivery_dashboard" && <DeliveryDashboard />}
