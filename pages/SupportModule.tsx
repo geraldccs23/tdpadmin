@@ -44,7 +44,7 @@ export function SupportModule({ userRole, clientId }: { userRole: string; client
 
   useEffect(() => {
     fetchTickets();
-    if (isInternal) api('/api/tdp/settings/clients').then(j => { if (j.ok) setClients(j.data || []); });
+    if (isInternal) api('/api/tdp/crm/clients').then(j => { if (j.ok) setClients(j.clients || []); });
   }, [search, statusFilter]);
 
   const openDetail = async (ticket: any) => {

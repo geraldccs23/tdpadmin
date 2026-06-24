@@ -41,7 +41,7 @@ export function CotizacionesModule() {
 
   useEffect(() => {
     fetchQuotes();
-    api('/api/tdp/crm/clients?status=active').then(j => { if (j.ok) setClients(j.clients || []); });
+    api('/api/tdp/crm/clients').then(j => { if (j.ok) setClients(j.clients || []); });
   }, [search, statusFilter]);
 
   const openNew = () => {
