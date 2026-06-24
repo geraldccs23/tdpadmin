@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Eye, Send, CheckCircle, XCircle, X, Save, Loader2, FileText, Pencil } from 'lucide-react';
+import { Plus, Search, Eye, Send, CheckCircle, XCircle, X, Save, Loader2, FileText, Pencil, Share2 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
 function getToken() { return localStorage.getItem('tdpadmin_auth_token'); }
@@ -30,6 +30,15 @@ export function CotizacionesModule() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [detail, setDetail] = useState<any>(null);
+  const [copied, setCopied] = useState(false);
+
+  const copyLink = (id: string) => {
+    const link = `${window.location.origin}/p/${id}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   const fetchQuotes = async () => {
     setLoading(true);
@@ -224,6 +233,9 @@ export function CotizacionesModule() {
               </table>
               {detail.notes && <div className="text-sm text-gray-600 bg-gray-50 rounded-xl p-4">{detail.notes}</div>}
               <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                <button onClick={() => copyLink(detail.id)} className="flex items-center gap-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-gray-200">
+                  <Share2 size={16} /> {copied ? '¡Copiado!' : 'Compartir'}
+                </button>
                 {detail.status === 'draft' && <button onClick={() => handleAction(detail.id, 'send')} className="flex items-center gap-1 bg-[#009FE3] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#0088c4]"><Send size={16} /> Marcar enviado</button>}
                 {detail.status === 'sent' && <>
                   <button onClick={() => handleAction(detail.id, 'approve')} className="flex items-center gap-1 bg-green-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-green-600"><CheckCircle size={16} /> Aprobar</button>

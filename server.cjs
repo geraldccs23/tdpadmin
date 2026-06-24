@@ -3125,6 +3125,176 @@ app.delete("/api/data/:table/:id", requireDataAuth, async (req, res) => {
 });
 
 // =============================================================================
+// Public: Quote sharing (no auth required)
+// =============================================================================
+
+// GET /api/p/quotes/:id — public view
+app.get("/api/p/quotes/:id", async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      `SELECT q.*, c.name AS client_name, c.email AS client_email, c.phone AS client_phone
+       FROM tdpadmin.quotes q
+       LEFT JOIN tdpadmin.clients c ON c.id = q.client_id
+       WHERE q.id = $1`, [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    const { rows: items } = await tdpPool.query(
+      "SELECT * FROM tdpadmin.quote_items WHERE quote_id = $1 ORDER BY display_order ASC, created_at ASC",
+      [req.params.id]
+    );
+    res.json({ ok: true, quote: { ...rows[0], items } });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /p/:id — public quote page
+app.get("/p/:id", async (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Presupuesto</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body{font-family:Inter,sans-serif;background:#f8f9fa}</style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4" id="app">
+<div class="text-center text-gray-400">Cargando...</div>
+<script>
+const API = window.location.origin;
+const locale = 'es-VE';
+const curr = new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD' });
+
+fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop())
+  .then(r => r.json())
+  .then(j => {
+    if (!j.ok) throw new Error(j.error);
+    const q = j.quote;
+    const items = q.items || [];
+    const statusColors = { draft:'bg-gray-100 text-gray-600', sent:'bg-blue-100 text-blue-700', approved:'bg-green-100 text-green-700', rejected:'bg-red-100 text-red-700' };
+    const statusLabels = { draft:'Borrador', sent:'Enviado', approved:'Aprobado', rejected:'Rechazado', expired:'Vencido', cancelled:'Cancelado' };
+
+    document.getElementById('app').innerHTML = \`
+      <div class="w-full max-w-3xl bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+        <div class="p-8 border-b border-gray-100 flex items-start justify-between gap-4">
+          <div>
+            <h1 class="text-2xl font-bold text-gray-900">\${q.quote_number}</h1>
+            <p class="text-gray-500 mt-1">\${q.title || 'Presupuesto'}</p>
+            <p class="text-sm text-gray-400 mt-0.5">\${q.client_name || ''}</p>
+          </div>
+          <span class="text-sm font-semibold px-3 py-1.5 rounded-full \${statusColors[q.status] || 'bg-gray-100'}">\${statusLabels[q.status] || q.status}</span>
+        </div>
+        <div class="p-8">
+          <table class="w-full">
+            <thead><tr class="border-b border-gray-100">
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Descripción</th>
+              <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Cant.</th>
+              <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Precio</th>
+              <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Total</th>
+            </tr></thead>
+            <tbody>
+              \${items.map(it => \`<tr class="border-b border-gray-50">
+                <td class="py-3 pr-4 text-gray-800">\${it.description}</td>
+                <td class="py-3 text-right text-gray-600 font-mono">\${Number(it.quantity).toFixed(2)}</td>
+                <td class="py-3 text-right text-gray-600 font-mono">\${curr.format(Number(it.unit_price))}</td>
+                <td class="py-3 text-right font-mono font-semibold text-gray-900">\${curr.format(Number(it.total_price))}</td>
+              </tr>\`).join('')}
+            </tbody>
+            \${Number(q.discount) > 0 ? \`<tfoot><tr><td colspan="3" class="pt-3 text-right text-gray-500">Descuento</td><td class="pt-3 text-right font-mono text-red-500">-\${curr.format(Number(q.discount))}</td></tr></tfoot>\` : ''}
+            <tfoot><tr class="font-bold text-gray-900"><td colspan="3" class="pt-3 text-right text-lg">Total</td><td class="pt-3 text-right font-mono text-lg">\${curr.format(Number(q.total))}</td></tr></tfoot>
+          </table>
+          \${q.notes ? '<div class="mt-6 p-4 bg-gray-50 rounded-xl text-sm text-gray-600">' + q.notes.replace(/\n/g, '<br>') + '</div>' : ''}
+          \${q.valid_until ? '<p class="mt-4 text-sm text-gray-400">Válido hasta: ' + q.valid_until.split('T')[0] + '</p>' : ''}
+        </div>
+        \${q.status === 'sent' ? \`
+        <div class="p-8 bg-gray-50 border-t border-gray-100">
+          <p class="text-sm text-gray-600 mb-4 text-center">¿Qué deseas hacer con este presupuesto?</p>
+          <div class="flex flex-col sm:flex-row gap-3 justify-center">
+            <button onclick="doAction('approve')" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-xl transition-all text-center">Aprobar</button>
+            <button onclick="promptReject()" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-xl transition-all text-center">Rechazar</button>
+            <button onclick="promptChanges()" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-xl transition-all text-center">Solicitar cambio</button>
+          </div>
+          <div id="actionMsg" class="mt-4 text-center text-sm"></div>
+        </div>
+        \` : ''}
+      </div>
+    \`;
+  })
+  .catch(e => { document.getElementById('app').innerHTML = '<div class="text-center text-red-500">Error: ' + e.message + '</div>'; });
+
+function doAction(action) {
+  fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop() + '/' + action, { method:'POST' })
+    .then(r => r.json())
+    .then(j => { if(j.ok) location.reload(); else alert(j.error); });
+}
+
+function promptReject() {
+  const reason = prompt('Motivo del rechazo (opcional):');
+  fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop() + '/reject', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ reason })
+  }).then(r => r.json()).then(j => { if(j.ok) location.reload(); else alert(j.error); });
+}
+
+function promptChanges() {
+  const msg = prompt('Describe qué cambios necesitas:');
+  if (!msg) return;
+  fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop() + '/request-changes', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ message: msg })
+  }).then(r => r.json()).then(j => { if(j.ok) location.reload(); else alert(j.error); });
+}
+</script>
+</body>
+</html>`);
+});
+
+// POST /api/p/quotes/:id/approve — public approve
+app.post("/api/p/quotes/:id/approve", async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      "UPDATE tdpadmin.quotes SET status = 'approved', approved_at = NOW() WHERE id = $1 AND status = 'sent' RETURNING *",
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(400).json({ ok: false, error: "quote not found or not in sent status" });
+    res.json({ ok: true, quote: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/p/quotes/:id/reject — public reject
+app.post("/api/p/quotes/:id/reject", async (req, res) => {
+  try {
+    const { reason } = req.body || {};
+    const { rows } = await tdpPool.query(
+      "UPDATE tdpadmin.quotes SET status = 'rejected', notes = CASE WHEN $2::text IS NOT NULL THEN COALESCE(notes, '') || E'\\nMotivo de rechazo: ' || $2 ELSE notes END WHERE id = $1 AND status = 'sent' RETURNING *",
+      [req.params.id, reason || null]
+    );
+    if (rows.length === 0) return res.status(400).json({ ok: false, error: "quote not found or not in sent status" });
+    res.json({ ok: true, quote: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/p/quotes/:id/request-changes — public request changes
+app.post("/api/p/quotes/:id/request-changes", async (req, res) => {
+  try {
+    const { message } = req.body || {};
+    const { rows } = await tdpPool.query(
+      "UPDATE tdpadmin.quotes SET status = 'draft', notes = COALESCE(notes, '') || E'\\nSolicitud de cambio: ' || $2 WHERE id = $1 AND status = 'sent' RETURNING *",
+      [req.params.id, message || '']
+    );
+    if (rows.length === 0) return res.status(400).json({ ok: false, error: "quote not found or not in sent status" });
+    res.json({ ok: true, quote: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// =============================================================================
 // Start server
 // =============================================================================
 app.listen(PORT, () => console.log("restaurantdp-server listening on", PORT));
