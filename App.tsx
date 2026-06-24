@@ -724,7 +724,7 @@ export default function App() {
             activeView={activeView}
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
-            allowedRoles={["admin"]}
+            allowedRoles={["superadmin", "admin", "sales"]}
             userRole={userRole}
           />
           <NavItem
@@ -734,7 +734,7 @@ export default function App() {
             activeView={activeView}
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
-            allowedRoles={["admin"]}
+            allowedRoles={["superadmin", "admin", "sales"]}
             userRole={userRole}
           />
           <NavItem
@@ -744,7 +744,7 @@ export default function App() {
             activeView={activeView}
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
-            allowedRoles={["admin"]}
+            allowedRoles={["superadmin", "admin", "sales"]}
             userRole={userRole}
           />
           <NavItem
