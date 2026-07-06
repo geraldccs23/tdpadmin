@@ -3705,10 +3705,9 @@ document.getElementById('leadForm').addEventListener('submit', async function(e)
 // Start server
 // =============================================================================
 
-// Root serves landing page (internal forward, no redirect)
-app.get("/", (req, res, next) => {
-  req.url = "/api/p/landing";
-  app._router.handle(req, res, next);
+// Root redirect to landing
+app.get("/", (req, res) => {
+  res.redirect(301, "/api/p/landing");
 });
 
 app.listen(PORT, () => console.log("restaurantdp-server listening on", PORT));
