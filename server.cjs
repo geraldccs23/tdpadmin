@@ -3231,15 +3231,55 @@ app.get("/api/p/view/:id", async (req, res) => {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Presupuesto</title>
+<title>Presupuesto — Taller de Pixeles</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-body{font-family:Inter,sans-serif;background:#f8f9fa}
-@media print{body{background:#fff}.no-print{display:none!important}}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+*{font-family:'Inter',sans-serif;margin:0;padding:0;box-sizing:border-box}
+body{background:#f3f4f6;padding:24px}
+@media print{body{padding:0;background:#fff}.no-print{display:none!important}}
+.quote-card{max-width:900px;margin:0 auto;background:#fff;border-radius:24px;box-shadow:0 4px 6px -1px rgba(0,0,0,.07),0 10px 40px -2px rgba(0,0,0,.08);overflow:hidden}
+.header-bar{background:linear-gradient(135deg,#0a1628,#0d1f3c);padding:32px 40px;color:#fff}
+.header-bar .logo-area{display:flex;align-items:center;gap:16px}
+.header-bar .logo-area img{width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,.1);padding:8px}
+.header-bar h1{font-size:20px;font-weight:700}
+.header-bar h1 span{color:#009FE3}
+.header-bar .company-info{font-size:12px;color:rgba(255,255,255,.6);line-height:1.6;margin-top:4px}
+.header-bar .badge{display:inline-block;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;background:rgba(255,255,255,.1);color:#fff}
+.section{padding:32px 40px}
+.section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-bottom:12px;border-bottom:2px solid #f3f4f6;padding-bottom:8px}
+table{width:100%;border-collapse:collapse}
+thead th{padding:10px 12px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;border-bottom:2px solid #e5e7eb}
+thead th:first-child{text-align:left}
+tbody td{padding:14px 12px;font-size:14px;border-bottom:1px solid #f3f4f6;text-align:right}
+tbody td:first-child{text-align:left;color:#111827;font-weight:500}
+tbody td:not(:first-child){font-family:'Courier New',monospace;color:#374151}
+tfoot td{padding:12px;font-size:15px;text-align:right;font-family:'Courier New',monospace;font-weight:700}
+tfoot tr:last-child td{border-top:2px solid #111827;font-size:18px;color:#111827}
+.btn{padding:12px 28px;border-radius:14px;font-size:14px;font-weight:600;border:none;cursor:pointer;transition:all .2s;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.btn-primary{background:#009FE3;color:#fff}
+.btn-primary:hover{background:#0088c4}
+.btn-success{background:#059669;color:#fff}
+.btn-success:hover{background:#047857}
+.btn-danger{background:#dc2626;color:#fff}
+.btn-danger:hover{background:#b91c1c}
+.btn-warning{background:#d97706;color:#fff}
+.btn-warning:hover{background:#b45309}
+.btn-outline{background:transparent;border:1px solid #d1d5db;color:#374151}
+.btn-outline:hover{background:#f9fafb}
+.footer{background:#f9fafb;padding:24px 40px;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;line-height:1.6;text-align:center}
+.footer strong{color:#374151}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.info-grid .label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px}
+.info-grid .value{font-size:14px;color:#111827}
+@media(max-width:640px){.header-bar,.section,.footer{padding:20px}.info-grid{grid-template-columns:1fr}.btn{width:100%;justify-content:center}}
 </style>
 </head>
-<body class="min-h-screen p-4" id="app">
-<div class="text-center text-gray-400 py-20">Cargando...</div>
+<body>
+<div id="app" class="quote-card">
+  <div class="text-center py-20 text-gray-400">Cargando...</div>
+</div>
 <script>
 const API = window.location.origin;
 const currUSD = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
@@ -3252,68 +3292,101 @@ fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop())
     const q = j.quote;
     const items = q.items || [];
     const er = q.exchange_rate;
-    const statusColors = {draft:'bg-gray-100 text-gray-600',sent:'bg-blue-100 text-blue-700',approved:'bg-green-100 text-green-700',rejected:'bg-red-100 text-red-700'};
-    const statusLabels = {draft:'Borrador',sent:'Enviado',approved:'Aprobado',rejected:'Rechazado',expired:'Vencido',cancelled:'Cancelado'};
     const hasVES = er && er > 0;
+    const st = q.status;
+    const isSent = st === 'sent';
+    const statusBadge = {draft:'Borrador',sent:'Enviado',approved:'Aprobado',rejected:'Rechazado',expired:'Vencido',cancelled:'Cancelado'}[st]||st;
+    const statusColor = {draft:'rgba(107,114,128,.15)',sent:'rgba(0,159,227,.15)',approved:'rgba(5,150,105,.15)',rejected:'rgba(220,38,38,.15)'}[st]||'rgba(107,114,128,.15)';
+    const statusTextColor = {draft:'#6b7280',sent:'#009FE3',approved:'#059669',rejected:'#dc2626'}[st]||'#6b7280';
 
     document.getElementById('app').innerHTML = \`
-      <div class="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden" id="quote">
-        <div class="p-8 border-b border-gray-100 flex items-start justify-between gap-4">
-          <div>
-            <h1 class="text-2xl font-bold text-gray-900">\${q.quote_number}</h1>
-            <p class="text-gray-500 mt-1">\${q.title || 'Presupuesto'}</p>
-            <p class="text-sm text-gray-400 mt-0.5">\${q.client_name || ''}</p>
+      <div class="header-bar">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
+          <div class="logo-area">
+            <img src="https://admin.tallerdepixeles.com/ISOTIPOTDP.png" alt="TDP">
+            <div>
+              <h1>Taller de <span>Pixeles</span></h1>
+              <div class="company-info">
+                Taller de Pixeles, C.A. · RIF J-50000272-6<br>
+                Av. San Carlos, Qta. San Onofre, La Floresta, Altamira<br>
+                Tel: 0414-7131270 / 0414-2530115
+              </div>
+            </div>
           </div>
-          <span class="text-sm font-semibold px-3 py-1.5 rounded-full \${statusColors[q.status] || 'bg-gray-100'}">\${statusLabels[q.status] || q.status}</span>
+          <div style="text-align:right">
+            <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:4px">\${q.quote_number}</div>
+            <span style="display:inline-block;padding:4px 14px;border-radius:20px;font-size:12px;font-weight:600;background:\${statusColor};color:\${statusTextColor}">\${statusBadge}</span>
+          </div>
         </div>
-        <div class="p-8">
-          <table class="w-full">
-            <thead><tr class="border-b border-gray-100">
-              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Descripcion</th>
-              <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Cant.</th>
-              <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Precio USD</th>
-              <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Total USD</th>
-              \${hasVES ? '<th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Total Bs.</th>' : ''}
-            </tr></thead>
-            <tbody>
-              \${items.map(it => {
-                const tusd = Number(it.total_price);
-                return \`<tr class="border-b border-gray-50">
-                  <td class="py-3 pr-4 text-gray-800">\${it.description}</td>
-                  <td class="py-3 text-right text-gray-600 font-mono">\${Number(it.quantity).toFixed(2)}</td>
-                  <td class="py-3 text-right text-gray-600 font-mono">\${currUSD.format(Number(it.unit_price))}</td>
-                  <td class="py-3 text-right font-mono font-semibold text-gray-900">\${currUSD.format(tusd)}</td>
-                  \${hasVES ? '<td class="py-3 text-right font-mono text-gray-500">Bs. ' + currVES.format(tusd * er) + '</td>' : ''}
-                </tr>\`;
-              }).join('')}
-            </tbody>
-            \${Number(q.discount) > 0 ? '<tfoot><tr><td colspan="' + (hasVES ? 4 : 3) + '" class="pt-3 text-right text-gray-500">Descuento</td><td class="pt-3 text-right font-mono text-red-500">-' + currUSD.format(Number(q.discount)) + '</td></tr></tfoot>' : ''}
-            <tfoot><tr class="font-bold text-gray-900"><td colspan="\${hasVES ? 4 : 3}" class="pt-3 text-right text-lg">Total</td><td class="pt-3 text-right font-mono text-lg">\${currUSD.format(Number(q.total))}</td>
-              \${hasVES ? '<td class="pt-3 text-right font-mono text-base text-gray-500">Bs. ' + currVES.format(Number(q.total) * er) + '</td>' : ''}
-            </tr></tfoot>
-          </table>
-          \${q.notes ? '<div class="mt-6 p-4 bg-gray-50 rounded-xl text-sm text-gray-600">' + q.notes.replace(/\\n/g,'<br>') + '</div>' : ''}
-          \${q.valid_until ? '<p class="mt-4 text-sm text-gray-400">Valido hasta: ' + q.valid_until.split('T')[0] + '</p>' : ''}
-          \${hasVES ? '<p class="mt-2 text-xs text-gray-400">Tasa de cambio: 1 USD = Bs. ' + Number(er).toFixed(2) + '</p>' : ''}
+      </div>
+
+      <div class="section">
+        <div class="info-grid">
+          <div>
+            <div class="label">Cliente</div>
+            <div class="value">\${q.client_name || '—'}</div>
+            \${q.client_email ? '<div style="font-size:13px;color:#6b7280;margin-top:2px">' + q.client_email + '</div>' : ''}
+          </div>
+          <div>
+            <div class="label">Presupuesto</div>
+            <div class="value">\${q.title || '—'}</div>
+            \${q.valid_until ? '<div style="font-size:13px;color:#6b7280;margin-top:2px">Valido hasta: ' + q.valid_until.split('T')[0] + '</div>' : ''}
+          </div>
         </div>
-        <div class="no-print p-8 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-3 justify-center">
-          <button onclick="window.print()" class="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-semibold text-sm transition-all">🖨️ Descargar PDF</button>
-          \${q.status === 'sent' ? \`
-            <button onclick="doAction('approve')" class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-semibold text-sm transition-all">Aprobar</button>
-            <button onclick="promptReject()" class="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold text-sm transition-all">Rechazar</button>
-            <button onclick="promptChanges()" class="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold text-sm transition-all">Solicitar cambio</button>
-          \` : ''}
-        </div>
-        <div id="actionMsg" class="no-print text-center text-sm p-4"></div>
+      </div>
+
+      <div class="section" style="padding-top:0">
+        <div class="section-title">Detalle de la propuesta</div>
+        <table>
+          <thead><tr>
+            <th style="width:45%">Descripcion</th>
+            <th style="width:10%">Cant.</th>
+            <th style="width:15%">Precio USD</th>
+            <th style="width:15%">Total USD</th>
+            \${hasVES ? '<th style="width:15%">Total Bs.</th>' : ''}
+          </tr></thead>
+          <tbody>
+            \${items.map(it => {
+              const tusd = Number(it.total_price);
+              return \`<tr>
+                <td>\${it.description}</td>
+                <td>\${Number(it.quantity).toFixed(2)}</td>
+                <td>\${currUSD.format(Number(it.unit_price))}</td>
+                <td>\${currUSD.format(tusd)}</td>
+                \${hasVES ? '<td style="color:#6b7280">Bs. ' + currVES.format(tusd * er) + '</td>' : ''}
+              </tr>\`;
+            }).join('')}
+          </tbody>
+          \${Number(q.discount) > 0 ? '<tfoot><tr><td colspan="' + (hasVES ? 4 : 3) + '" style="text-align:right;color:#6b7280;font-weight:400;font-size:14px">Descuento</td><td style="color:#dc2626">-' + currUSD.format(Number(q.discount)) + '</td></tr></tfoot>' : ''}
+          <tfoot><tr><td colspan="\${hasVES ? 4 : 3}" style="font-size:18px">Total</td><td style="font-size:18px">\${currUSD.format(Number(q.total))}</td>
+            \${hasVES ? '<td style="font-size:15px;color:#6b7280">Bs. ' + currVES.format(Number(q.total) * er) + '</td>' : ''}
+          </tr></tfoot>
+        </table>
+        \${hasVES ? '<div style="font-size:12px;color:#9ca3af;margin-top:8px;text-align:right">Tasa de cambio: 1 USD = Bs. ' + Number(er).toFixed(2) + '</div>' : ''}
+      </div>
+
+      \${q.notes ? '<div class="section" style="padding-top:0"><div class="section-title">Notas</div><div style="font-size:14px;color:#374151;line-height:1.6;white-space:pre-line">' + q.notes.replace(/\\n/g,'<br>') + '</div></div>' : ''}
+
+      \${isSent ? '<div class="section" style="padding-top:0;padding-bottom:0"><div class="section-title">Acciones</div></div><div class="section" style="padding-top:12px"><div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center">' +
+        '<button class="btn btn-success" onclick="doAction(\\'approve\\')">✅ Aprobar presupuesto</button>' +
+        '<button class="btn btn-danger" onclick="promptReject()">❌ Rechazar</button>' +
+        '<button class="btn btn-warning" onclick="promptChanges()">✏️ Solicitar cambio</button>' +
+      '</div><div id="actionMsg" style="text-align:center;font-size:14px;margin-top:12px;color:#059669;font-weight:600"></div></div>' : ''}
+
+      <div class="footer">
+        <strong>Taller de Pixeles, C.A.</strong> · RIF J-50000272-6<br>
+        Av. San Carlos, Qta. San Onofre, La Floresta, Altamira<br>
+        Tel: 0414-7131270 / 0414-2530115<br><br>
+        <span style="font-size:11px">© \${new Date().getFullYear()} Taller de Pixeles C.A. — Todos los derechos reservados</span>
+        <span class="no-print" style="display:block;margin-top:12px"><button class="btn btn-outline" onclick="window.print()" style="font-size:12px;padding:8px 20px">🖨️ Imprimir / PDF</button></span>
       </div>
     \`;
   })
-  .catch(e => { document.getElementById('app').innerHTML = '<div class="text-center text-red-500 py-20">Error: ' + e.message + '</div>'; });
+  .catch(e => { document.getElementById('app').innerHTML = '<div class="quote-card"><div style="padding:60px;text-align:center;color:#dc2626;font-size:16px">Error: ' + e.message + '</div></div>'; });
 
 function doAction(action) {
   fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop() + '/' + action, { method:'POST' })
-    .then(r => r.json())
-    .then(j => { if(j.ok) location.reload(); else alert(j.error); });
+    .then(r => r.json()).then(j => { if(j.ok) location.reload(); else alert(j.error); });
 }
 
 function promptReject() {
