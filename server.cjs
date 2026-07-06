@@ -3704,4 +3704,10 @@ document.getElementById('leadForm').addEventListener('submit', async function(e)
 // =============================================================================
 // Start server
 // =============================================================================
+
+// Root redirect to landing
+app.get("/", (req, res) => {
+  res.redirect("/api/p/landing");
+});
+
 app.listen(PORT, () => console.log("restaurantdp-server listening on", PORT));
