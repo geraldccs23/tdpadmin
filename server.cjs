@@ -3303,9 +3303,8 @@ fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop())
       <div class="header-bar">
         <div style="text-align:center">
           <div style="margin-bottom:8px">
-            <img src="https://admin.tallerdepixeles.com/ISOTIPOTDP.png" alt="TDP" style="max-width:160px;height:auto;display:block;margin:0 auto">
+            <img src="https://admin.tallerdepixeles.com/ISOTIPOTDP.png" alt="TDP" style="max-width:160px;height:auto;display:block;margin:0 auto;filter:brightness(0)invert(1)">
           </div>
-          <h1 style="font-size:24px;font-weight:800;margin-bottom:4px">Taller de <span style="color:#009FE3">Pixeles</span></h1>
           <div class="company-info" style="font-size:13px;color:rgba(255,255,255,.6);line-height:1.7">
             Taller de Pixeles, C.A. · RIF J-50000272-6<br>
             Av. San Carlos, Qta. San Onofre, La Floresta, Altamira<br>
@@ -3524,7 +3523,6 @@ app.get("/api/p/landing", async (req, res) => {
   <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
     <div class="flex items-center gap-3">
       <img src="https://admin.tallerdepixeles.com/ISOTIPOTDP.png" alt="" class="h-8 w-auto brightness-0 invert">
-      <span class="text-lg font-bold tracking-tight">Taller de <span class="text-tdp-500">Pixeles</span></span>
     </div>
     <div class="hidden md:flex items-center gap-8 text-sm text-gray-300">
       <a href="#servicios" class="hover:text-tdp-400 transition-colors">Servicios</a>
