@@ -3516,12 +3516,10 @@ app.post("/api/purchases/orders/:id/send", requireJwt, async (req, res) => {
       [req.params.id],
     );
     if (rows.length === 0)
-      return res
-        .status(400)
-        .json({
-          ok: false,
-          error: "order must be approved first or already sent",
-        });
+      return res.status(400).json({
+        ok: false,
+        error: "order must be approved first or already sent",
+      });
     res.json({ ok: true, data: rows[0] });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
@@ -3624,12 +3622,10 @@ app.post("/api/purchases/receptions", requireJwt, async (req, res) => {
     const order = orderRows[0];
     if (!["sent", "partial"].includes(order.status)) {
       await client.query("ROLLBACK");
-      return res
-        .status(400)
-        .json({
-          ok: false,
-          error: `order status ${order.status} cannot receive`,
-        });
+      return res.status(400).json({
+        ok: false,
+        error: `order status ${order.status} cannot receive`,
+      });
     }
 
     // Validate each line
@@ -3640,24 +3636,20 @@ app.post("/api/purchases/receptions", requireJwt, async (req, res) => {
       );
       if (pol.length === 0) {
         await client.query("ROLLBACK");
-        return res
-          .status(400)
-          .json({
-            ok: false,
-            error: `line ${line.order_line_id} not found in order`,
-          });
+        return res.status(400).json({
+          ok: false,
+          error: `line ${line.order_line_id} not found in order`,
+        });
       }
       const pl = pol[0];
       const pending =
         Number(pl.quantity_ordered) - Number(pl.quantity_received);
       if (Number(line.quantity_received) > pending) {
         await client.query("ROLLBACK");
-        return res
-          .status(400)
-          .json({
-            ok: false,
-            error: `cannot receive more than pending (${pending}) for line ${pl.id}`,
-          });
+        return res.status(400).json({
+          ok: false,
+          error: `cannot receive more than pending (${pending}) for line ${pl.id}`,
+        });
       }
     }
 
@@ -4663,7 +4655,7 @@ fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop())
           </div>
           <div style="background:#f9fafb;border-radius:12px;padding:16px;font-size:13px;line-height:1.6">
             <strong style="color:#111827;display:block;margin-bottom:6px">Banplus — Pago Movil</strong>
-            <span style="color:#6b7280">0412 8056568</span><br>
+            <span style="color:#6b7280">0422 7493537</span><br>
             <span style="color:#6b7280">J-500002726</span><br>
             <span style="color:#6b7280">Taller de Pixeles, C.A.</span>
           </div>
