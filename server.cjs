@@ -3301,22 +3301,20 @@ fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop())
 
     document.getElementById('app').innerHTML = \`
       <div class="header-bar">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
-          <div class="logo-area">
-            <img src="https://admin.tallerdepixeles.com/ISOTIPOTDP.png" alt="TDP">
-            <div>
-              <h1>Taller de <span>Pixeles</span></h1>
-              <div class="company-info">
-                Taller de Pixeles, C.A. · RIF J-50000272-6<br>
-                Av. San Carlos, Qta. San Onofre, La Floresta, Altamira<br>
-                Tel: 0414-7131270 / 0414-2530115
-              </div>
-            </div>
+        <div style="text-align:center">
+          <div style="margin-bottom:12px">
+            <img src="https://admin.tallerdepixeles.com/ISOTIPOTDP.png" alt="TDP" style="width:64px;height:64px;border-radius:16px;background:rgba(255,255,255,.1);padding:12px;margin:0 auto">
           </div>
-          <div style="text-align:right">
-            <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:4px">\${q.quote_number}</div>
-            <span style="display:inline-block;padding:4px 14px;border-radius:20px;font-size:12px;font-weight:600;background:\${statusColor};color:\${statusTextColor}">\${statusBadge}</span>
+          <h1 style="font-size:24px;font-weight:800;margin-bottom:4px">Taller de <span style="color:#009FE3">Pixeles</span></h1>
+          <div class="company-info" style="font-size:13px;color:rgba(255,255,255,.6);line-height:1.7">
+            Taller de Pixeles, C.A. · RIF J-50000272-6<br>
+            Av. San Carlos, Qta. San Onofre, La Floresta, Altamira<br>
+            Tel: 0414-7131270 / 0414-2530115
           </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;flex-wrap:wrap;gap:12px">
+          <div style="font-size:28px;font-weight:800;color:#fff">\${q.quote_number}</div>
+          <span style="display:inline-block;padding:4px 14px;border-radius:20px;font-size:12px;font-weight:600;background:\${statusColor};color:\${statusTextColor}">\${statusBadge}</span>
         </div>
       </div>
 
