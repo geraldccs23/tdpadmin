@@ -820,10 +820,8 @@ export default function App() {
               activeView={activeView}
               isOpen={isSidebarOpen || window.innerWidth < 768}
               onClick={handleSetView}
-              allowedRoles={["admin"]}
+              allowedRoles={["superadmin", "admin"]}
               userRole={userRole}
-              perm="users.view"
-              userPermissions={permissions}
             />
             <NavItem
               icon={SettingsIcon}
@@ -832,10 +830,8 @@ export default function App() {
               activeView={activeView}
               isOpen={isSidebarOpen || window.innerWidth < 768}
               onClick={handleSetView}
-              allowedRoles={["admin"]}
+              allowedRoles={["superadmin", "admin"]}
               userRole={userRole}
-              perm="settings.view"
-              userPermissions={permissions}
             />
             <NavItem
               icon={Key}
@@ -844,10 +840,8 @@ export default function App() {
               activeView={activeView}
               isOpen={isSidebarOpen || window.innerWidth < 768}
               onClick={handleSetView}
-              allowedRoles={["admin"]}
+              allowedRoles={["superadmin", "admin"]}
               userRole={userRole}
-              perm="settings.view"
-              userPermissions={permissions}
             />
             </>
           )}
