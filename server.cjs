@@ -3302,8 +3302,8 @@ fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop())
     document.getElementById('app').innerHTML = \`
       <div class="header-bar">
         <div style="text-align:center">
-          <div style="margin-bottom:12px">
-            <img src="https://admin.tallerdepixeles.com/ISOTIPOTDP.png" alt="TDP" style="width:64px;height:64px;border-radius:16px;background:rgba(255,255,255,.1);padding:12px;margin:0 auto">
+          <div style="margin-bottom:8px">
+            <img src="https://admin.tallerdepixeles.com/ISOTIPOTDP.png" alt="TDP" style="max-width:160px;height:auto;display:block;margin:0 auto">
           </div>
           <h1 style="font-size:24px;font-weight:800;margin-bottom:4px">Taller de <span style="color:#009FE3">Pixeles</span></h1>
           <div class="company-info" style="font-size:13px;color:rgba(255,255,255,.6);line-height:1.7">
@@ -3364,6 +3364,25 @@ fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop())
       </div>
 
       \${q.notes ? '<div class="section" style="padding-top:0"><div class="section-title">Notas</div><div style="font-size:14px;color:#374151;line-height:1.6;white-space:pre-line">' + q.notes.replace(/\\n/g,'<br>') + '</div></div>' : ''}
+
+      <div class="section" style="padding-top:0">
+        <div class="section-title">Datos de pago</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div style="background:#f9fafb;border-radius:12px;padding:16px;font-size:13px;line-height:1.6">
+            <strong style="color:#111827;display:block;margin-bottom:6px">Banplus — Cuenta Corriente</strong>
+            <span style="color:#6b7280">Transferencias</span><br>
+            <span style="font-family:'Courier New',monospace;font-weight:600;color:#111827">0174 0131 93 1314977321</span><br>
+            <span style="color:#6b7280">J-500002726</span><br>
+            <span style="color:#6b7280">Taller de Pixeles, C.A.</span>
+          </div>
+          <div style="background:#f9fafb;border-radius:12px;padding:16px;font-size:13px;line-height:1.6">
+            <strong style="color:#111827;display:block;margin-bottom:6px">Banplus — Pago Movil</strong>
+            <span style="color:#6b7280">0412 8056568</span><br>
+            <span style="color:#6b7280">J-500002726</span><br>
+            <span style="color:#6b7280">Taller de Pixeles, C.A.</span>
+          </div>
+        </div>
+      </div>
 
       \${isSent ? '<div class="section" style="padding-top:0;padding-bottom:0"><div class="section-title">Acciones</div></div><div class="section" style="padding-top:12px"><div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center">' +
         '<button class="btn btn-success" onclick="doAction(\\'approve\\')">✅ Aprobar presupuesto</button>' +
