@@ -260,7 +260,7 @@ app.post("/api/tdp/exchange-rates", requireTDPAuth, async (req, res) => {
 // --------------------
 
 function isInternalRole(role) {
-  return ['superadmin', 'admin', 'support'].includes(role);
+  return ['superadmin', 'admin', 'director', 'project_manager', 'developer', 'support'].includes(role);
 }
 
 // GET /api/tdp/support/tickets
@@ -455,7 +455,7 @@ app.get("/api/tdp/clients", requireTDPAuth, async (req, res) => {
 // --------------------
 
 function requireCRMAccess(req, res, next) {
-  if (!['superadmin', 'admin', 'sales', 'support', 'staff'].includes(req.tdpUser.role)) {
+  if (!['superadmin', 'admin', 'director', 'project_manager', 'sales', 'support', 'staff'].includes(req.tdpUser.role)) {
     return res.status(403).json({ ok: false, error: "forbidden" });
   }
   next();
@@ -3119,6 +3119,82 @@ app.delete("/api/data/:table/:id", requireDataAuth, async (req, res) => {
       [id]
     );
     res.json({ ok: true, deleted: rowCount });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// =============================================================================
+// TDP Users Management
+// =============================================================================
+
+function requireUserAdmin(req, res, next) {
+  if (!['superadmin', 'admin'].includes(req.tdpUser.role)) {
+    return res.status(403).json({ ok: false, error: "forbidden" });
+  }
+  next();
+}
+
+// GET /api/tdp/users
+app.get("/api/tdp/users", requireTDPAuth, requireUserAdmin, async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      "SELECT id, email, full_name, role, status, client_id, last_login_at, created_at FROM tdpadmin.users ORDER BY full_name ASC"
+    );
+    res.json({ ok: true, users: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/users
+app.post("/api/tdp/users", requireTDPAuth, requireUserAdmin, async (req, res) => {
+  try {
+    const { email, password, full_name, role } = req.body || {};
+    if (!email || !password) return res.status(400).json({ ok: false, error: "email and password required" });
+    const validRoles = ['superadmin', 'admin', 'director', 'project_manager', 'developer', 'sales', 'support', 'finance', 'staff', 'client'];
+    const userRole = validRoles.includes(role) ? role : 'staff';
+    const hash = bcrypt.hashSync(password, 10);
+    const { rows } = await tdpPool.query(
+      `INSERT INTO tdpadmin.users (email, password_hash, full_name, role) VALUES ($1,$2,$3,$4)
+       RETURNING id, email, full_name, role, status, created_at`,
+      [email.trim().toLowerCase(), hash, full_name || email, userRole]
+    );
+    res.json({ ok: true, user: rows[0] });
+  } catch (e) {
+    const msg = e?.constraint === 'tdpadmin_users_email_key' ? 'email already exists' : String(e?.message || e);
+    res.status(400).json({ ok: false, error: msg });
+  }
+});
+
+// PATCH /api/tdp/users/:id
+app.patch("/api/tdp/users/:id", requireTDPAuth, requireUserAdmin, async (req, res) => {
+  try {
+    const sets = []; const params = []; let idx = 0;
+    for (const key of ['full_name', 'role', 'status']) {
+      if (req.body[key] !== undefined) { idx++; sets.push(`${key} = $${idx}`); params.push(req.body[key]); }
+    }
+    if (req.body.password) { idx++; sets.push(`password_hash = $${idx}`); params.push(bcrypt.hashSync(req.body.password, 10)); }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields" });
+    idx++; params.push(req.params.id);
+    const { rows } = await tdpPool.query(
+      `UPDATE tdpadmin.users SET ${sets.join(', ')} WHERE id = $${idx} RETURNING id, email, full_name, role, status, created_at`, params
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, user: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// DELETE /api/tdp/users/:id — soft delete
+app.delete("/api/tdp/users/:id", requireTDPAuth, requireUserAdmin, async (req, res) => {
+  try {
+    const { rowCount } = await tdpPool.query(
+      "UPDATE tdpadmin.users SET status = 'inactive' WHERE id = $1 AND status = 'active'", [req.params.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ ok: false, error: "not found or already inactive" });
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
   }

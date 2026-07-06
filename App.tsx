@@ -164,48 +164,19 @@ export type Role =
   | "sales"
   | "staff"
   | "finance"
-  | "client";
+  | "client"
+  | "project_manager"
+  | "developer";
 
 const rolePermissions: Record<Role, View[]> = {
   director: [
-    "dashboard",
-    "inventory",
-    "erp_inventory",
-    "suppliers",
-    "sales",
-    "purchases",
-    "sync",
-    "settings",
-    "fordmac",
-    "income",
-    "expenses",
-    "banks",
-    "admin_dashboard",
-    "cashea",
-    "customers",
-    "cxc",
-    "cxp",
-    "internal_transfers",
-    "purchase_orders",
-    "cashier_closing",
-    "support",
-    "commissions",
-    "sales_dashboard",
-    "delivery_dashboard",
-    "seller_performance",
-    "bank_history",
-    "attendance_admin",
-    "attendance_mark",
-    "attendance_qr",
-    "national_shipping",
-    "director_logistics",
-    "expenses_dashboard",
-    "delivery_panel",
-    "warehouse",
+    "dashboard_restaurant",
     "crm",
-    "integrations",
-    "intercompany",
-    "inventory_dashboard",
+    "proyectos",
+    "cotizaciones",
+    "support_tdp",
+    "settings",
+    "users",
   ],
   supervisor: [
     "inventory",
@@ -431,10 +402,19 @@ const rolePermissions: Record<Role, View[]> = {
   finance: [
     "support_tdp",
   ],
+  project_manager: [
+    "support_tdp",
+    "crm",
+    "proyectos",
+    "cotizaciones",
+  ],
+  developer: [
+    "support_tdp",
+  ],
 };
 
 const defaultViews: Record<Role, View> = {
-  director: "dashboard",
+  director: "dashboard_restaurant",
   supervisor: "dashboard",
   supervisor_ventas: "income",
   supervisor_compras: "purchase_orders",
@@ -454,6 +434,8 @@ const defaultViews: Record<Role, View> = {
   sales: "support_tdp",
   staff: "support_tdp",
   finance: "support_tdp",
+  project_manager: "support_tdp",
+  developer: "support_tdp",
 };
 
 interface NavItemProps {
@@ -507,7 +489,7 @@ export default function App() {
   const [savingRate, setSavingRate] = useState(false);
 
   const fetchUserRole = async (userId: string | null, email: string, presetRole?: string) => {
-    if (presetRole && ['director','supervisor','supervisor_ventas','supervisor_compras','administrador','cajero','vendedor','compras','soporte','delivery','supervisor_almacen','almacenista','admin','cocina','superadmin','support','sales','staff','finance','client'].includes(presetRole)) {
+    if (presetRole && ['director','supervisor','supervisor_ventas','supervisor_compras','administrador','cajero','vendedor','compras','soporte','delivery','supervisor_almacen','almacenista','admin','cocina','superadmin','support','sales','staff','finance','client','director','project_manager','developer'].includes(presetRole)) {
       setUserRole(presetRole as Role);
       return;
     }
