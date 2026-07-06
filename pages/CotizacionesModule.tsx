@@ -42,7 +42,7 @@ export function CotizacionesModule() {
   }, []);
 
   const copyLink = (id: string) => {
-    const link = `${window.location.origin}/api/p/view/${id}`;
+    const link = `${API_URL}/api/p/view/${id}`;
     navigator.clipboard.writeText(link).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -276,7 +276,7 @@ export function CotizacionesModule() {
                 <button onClick={() => copyLink(detail.id)} className="flex items-center gap-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-gray-200">
                   <Share2 size={16} /> {copied ? '¡Copiado!' : 'Compartir'}
                 </button>
-                <button onClick={() => window.open(`/api/p/view/${detail.id}`, '_blank')} className="flex items-center gap-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-gray-200">
+                <button onClick={() => window.open(`${API_URL}/api/p/view/${detail.id}`, '_blank')} className="flex items-center gap-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-gray-200">
                   <Printer size={16} /> Ver / PDF
                 </button>
                 {detail.status === 'draft' && <button onClick={() => handleAction(detail.id, 'send')} className="flex items-center gap-1 bg-[#009FE3] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#0088c4]"><Send size={16} /> Marcar enviado</button>}
