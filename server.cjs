@@ -4796,4 +4796,9 @@ app.get("/", (req, res) => {
   res.sendFile("index.html", { root: "public" });
 });
 
+// Legacy redirect
+app.get("/api/p/landing", (req, res) => {
+  res.redirect(301, "/");
+});
+
 app.listen(PORT, () => console.log("restaurantdp-server listening on", PORT));
