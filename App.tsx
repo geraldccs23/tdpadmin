@@ -804,7 +804,7 @@ export default function App() {
             userRole={userRole}
           />
 
-          {userRole === "admin" && (
+          {(userRole === "superadmin" || userRole === "admin") && (
             <>
             <div className="pb-2 mb-2">
               <div className="px-4 py-2 bg-[#009FE3]/10 border-l-2 border-[#009FE3] mb-2">
@@ -852,7 +852,7 @@ export default function App() {
             </>
           )}
 
-          {userRole !== "admin" && userRole !== "cocina" && (
+          {userRole !== "superadmin" && userRole !== "admin" && userRole !== "cocina" && userRole !== "support" && userRole !== "sales" && userRole !== "staff" && userRole !== "finance" && userRole !== "client" && (
           <>
           {/* ======================= PROFIT PLUS ======================= */}
           <div className="pb-2 mb-2">
