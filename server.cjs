@@ -3295,6 +3295,238 @@ app.post("/api/p/quotes/:id/request-changes", async (req, res) => {
 });
 
 // =============================================================================
+// Public: Landing page & lead capture
+// =============================================================================
+
+// POST /api/p/lead — capture prospect from landing page
+app.post("/api/p/lead", async (req, res) => {
+  try {
+    const { name, email, phone, company, service, message } = req.body || {};
+    if (!name || !email) return res.status(400).json({ ok: false, error: "name and email required" });
+    const interest = service || 'no especificado';
+    const { rows } = await tdpPool.query(
+      `INSERT INTO tdpadmin.clients (name, email, phone, company_name, interest, source, status, kind, notes, created_by)
+       VALUES ($1,$2,$3,$4,$5,'web','lead','prospect',$6,(SELECT id FROM tdpadmin.users WHERE role='superadmin' LIMIT 1))
+       RETURNING id`,
+      [name, email, phone || '', company || '', interest, message || '']
+    );
+    res.json({ ok: true, client_id: rows[0].id });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET / — landing page
+app.get("/", async (req, res) => {
+  const isBot = req.headers['user-agent']?.toLowerCase().includes('bot') || req.headers['user-agent']?.toLowerCase().includes('curl');
+  if (isBot) return res.send('Taller de Pixeles - Desarrollo Web y Sistemas de Gestion');
+  res.send(`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Taller de Pixeles — Desarrollo Web y Sistemas de Gestion</title>
+<meta name="description" content="Transformamos tu negocio con soluciones digitales: desarrollo web, sistemas de gestion, ecommerce, automatizaciones y soporte tecnico.">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={theme:{extend:{colors:{tdp:{50:'#e8f7ff',100:'#b3e6ff',200:'#80d6ff',300:'#4dc5ff',400:'#1ab5ff',500:'#009FE3',600:'#0088c4',700:'#0070a3',800:'#005882',900:'#004061'}}}}}</script>
+<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+*{font-family:'Inter',sans-serif}
+.glow{box-shadow:0 0 40px rgba(0,159,227,.15)}
+.glow-text{text-shadow:0 0 40px rgba(0,159,227,.3)}
+.hero-gradient{background:linear-gradient(135deg,#0a1628 0%,#0d1f3c 50%,#0a1628 100%)}
+.card-hover{transition:all .3s ease}
+.card-hover:hover{transform:translateY(-4px);box-shadow:0 20px 60px rgba(0,159,227,.12)}
+.input-glass{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(10px)}
+.input-glass:focus{border-color:#009FE3;box-shadow:0 0 20px rgba(0,159,227,.15)}
+</style>
+</head>
+<body class="bg-[#0a1628] text-white antialiased">
+
+<!-- NAV -->
+<nav class="fixed top-0 w-full z-50 bg-[#0a1628]/80 backdrop-blur-xl border-b border-white/5">
+  <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <img src="https://admin.tallerdepixeles.com/ISOTIPOTDP.png" alt="" class="h-8 w-auto brightness-0 invert">
+      <span class="text-lg font-bold tracking-tight">Taller de <span class="text-tdp-500">Pixeles</span></span>
+    </div>
+    <div class="hidden md:flex items-center gap-8 text-sm text-gray-300">
+      <a href="#servicios" class="hover:text-tdp-400 transition-colors">Servicios</a>
+      <a href="#proceso" class="hover:text-tdp-400 transition-colors">Proceso</a>
+      <a href="#cotiza" class="hover:text-tdp-400 transition-colors">Cotizar</a>
+      <a href="https://admin.tallerdepixeles.com" class="px-5 py-2.5 bg-tdp-500 hover:bg-tdp-600 rounded-xl text-white font-semibold text-sm transition-all glow">Acceso Administrador</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero-gradient min-h-screen flex items-center relative overflow-hidden pt-20">
+  <div class="absolute inset-0 opacity-30" style="background:radial-gradient(circle at 30% 50%,#009FE3 0%,transparent 50%),radial-gradient(circle at 70% 30%,#009FE3 0%,transparent 40%)"></div>
+  <div class="max-w-7xl mx-auto px-6 py-20 relative z-10">
+    <div class="max-w-3xl">
+      <div class="inline-flex items-center gap-2 bg-tdp-500/10 border border-tdp-500/20 rounded-full px-4 py-1.5 text-tdp-400 text-sm font-medium mb-6">
+        <span class="w-2 h-2 rounded-full bg-tdp-500 animate-pulse"></span>
+        Transformamos tu idea en solucion digital
+      </div>
+      <h1 class="text-5xl md:text-7xl font-black leading-tight mb-6">
+        <span class="glow-text">Sistemas de Gestion</span><br>
+        <span class="text-gray-400">y Desarrollo Web</span>
+      </h1>
+      <p class="text-lg md:text-xl text-gray-400 leading-relaxed mb-10 max-w-2xl">
+        Ayudamos a empresas de cualquier rubro a digitalizar su operacion con software a medida, 
+        paginas web profesionales y automatizaciones que optimizan tu gestion diaria.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4">
+        <a href="#cotiza" class="px-8 py-4 bg-tdp-500 hover:bg-tdp-600 rounded-2xl text-white font-bold text-lg text-center transition-all glow">Solicitar Cotizacion</a>
+        <a href="#servicios" class="px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-gray-300 font-semibold text-lg text-center transition-all">Ver Servicios</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SERVICIOS -->
+<section id="servicios" class="py-24 bg-[#0d1f3c]">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="text-center mb-16">
+      <h2 class="text-4xl md:text-5xl font-black mb-4">Servicios <span class="text-tdp-500">Profesionales</span></h2>
+      <p class="text-gray-400 text-lg max-w-2xl mx-auto">Soluciones completas para empresas que buscan crecer con tecnologia</p>
+    </div>
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+      ${[
+        {icon:'🖥️',title:'Desarrollo Web',desc:'Paginas institucionales, landing pages, portales corporativos y tiendas en linea con diseño moderno y responsive.'},
+        {icon:'📊',title:'Sistemas de Gestion',desc:'ERPs, CRM, facturacion, inventario, compras y mas. Automatizamos procesos clave de tu negocio.'},
+        {icon:'🛒',title:'Ecommerce',desc:'Tiendas online con carrito de compras, pasarela de pago, inventario sincronizado y panel administrativo.'},
+        {icon:'🤖',title:'Automatizaciones',desc:'Integraciones entre plataformas, bots de WhatsApp, correos automaticos y flujos de trabajo inteligentes.'},
+        {icon:'☁️',title:'Hosting & Dominios',desc:'Alojamiento web optimizado, certificados SSL, correo corporativo y administracion de dominios.'},
+        {icon:'🔧',title:'Soporte Tecnico',desc:'Mantenimiento continuo, soporte via ticket, actualizaciones de seguridad y respaldo de datos.'},
+      ].map(s => `<div class="bg-white/5 backdrop-blur-sm rounded-3xl p-8 border border-white/5 card-hover">
+        <div class="text-4xl mb-5">${s.icon}</div>
+        <h3 class="text-xl font-bold mb-3">${s.title}</h3>
+        <p class="text-gray-400 leading-relaxed">${s.desc}</p>
+      </div>`).join('')}
+    </div>
+  </div>
+</section>
+
+<!-- PROCESO -->
+<section id="proceso" class="py-24 bg-[#0a1628]">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="text-center mb-16">
+      <h2 class="text-4xl md:text-5xl font-black mb-4">Como <span class="text-tdp-500">Trabajamos</span></h2>
+      <p class="text-gray-400 text-lg">Metodologia clara y transparente de principio a fin</p>
+    </div>
+    <div class="grid md:grid-cols-4 gap-8">
+      ${[
+        {n:'01',t:'Diagnostico',d:'Entendemos tu negocio, tus procesos y lo que necesitas lograr.'},
+        {n:'02',t:'Propuesta',d:'Te presentamos una solucion clara con alcance, tiempos y presupuesto.'},
+        {n:'03',t:'Desarrollo',d:'Construimos tu solucion con entregas parciales y revision constante.'},
+        {n:'04',t:'Entrega & Soporte',d:'Implementamos, capacitamos y te acompanamos con soporte continuo.'},
+      ].map(p => `<div class="text-center">
+        <div class="w-16 h-16 mx-auto rounded-2xl bg-tdp-500/10 border border-tdp-500/20 flex items-center justify-center text-tdp-400 font-black text-xl mb-5">${p.n}</div>
+        <h3 class="text-lg font-bold mb-2">${p.t}</h3>
+        <p class="text-gray-400 text-sm leading-relaxed">${p.d}</p>
+      </div>`).join('')}
+    </div>
+  </div>
+</section>
+
+<!-- COTIZACION -->
+<section id="cotiza" class="py-24 bg-[#0d1f3c]">
+  <div class="max-w-4xl mx-auto px-6">
+    <div class="text-center mb-12">
+      <h2 class="text-4xl md:text-5xl font-black mb-4">Solicita tu <span class="text-tdp-500">Presupuesto</span></h2>
+      <p class="text-gray-400 text-lg">Cuentanos tu proyecto y te responderemos en menos de 24 horas</p>
+    </div>
+    <div class="bg-white/5 backdrop-blur-sm rounded-3xl p-8 md:p-12 border border-white/5 glow">
+      <form id="leadForm" class="space-y-5">
+        <div class="grid md:grid-cols-2 gap-5">
+          <div><label class="text-sm font-medium text-gray-300 mb-1.5 block">Nombre *</label><input type="text" id="leadName" required class="w-full input-glass rounded-xl px-4 py-3 text-white text-sm outline-none transition-all" placeholder="Tu nombre"></div>
+          <div><label class="text-sm font-medium text-gray-300 mb-1.5 block">Email *</label><input type="email" id="leadEmail" required class="w-full input-glass rounded-xl px-4 py-3 text-white text-sm outline-none transition-all" placeholder="tu@email.com"></div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-5">
+          <div><label class="text-sm font-medium text-gray-300 mb-1.5 block">Telefono</label><input type="text" id="leadPhone" class="w-full input-glass rounded-xl px-4 py-3 text-white text-sm outline-none transition-all" placeholder="+58 412 123 4567"></div>
+          <div><label class="text-sm font-medium text-gray-300 mb-1.5 block">Empresa</label><input type="text" id="leadCompany" class="w-full input-glass rounded-xl px-4 py-3 text-white text-sm outline-none transition-all" placeholder="Nombre de tu empresa"></div>
+        </div>
+        <div><label class="text-sm font-medium text-gray-300 mb-1.5 block">¿Que servicio necesitas?</label>
+          <select id="leadService" class="w-full input-glass rounded-xl px-4 py-3 text-white text-sm outline-none transition-all">
+            <option value="" class="bg-[#0d1f3c]">Seleccionar...</option>
+            <option value="pagina web" class="bg-[#0d1f3c]">Pagina Web</option>
+            <option value="sistema de gestion" class="bg-[#0d1f3c]">Sistema de Gestion</option>
+            <option value="ecommerce" class="bg-[#0d1f3c]">Tienda Online / Ecommerce</option>
+            <option value="automatizacion" class="bg-[#0d1f3c]">Automatizacion</option>
+            <option value="hosting" class="bg-[#0d1f3c]">Hosting / Dominio</option>
+            <option value="soporte" class="bg-[#0d1f3c]">Soporte Tecnico</option>
+            <option value="otro" class="bg-[#0d1f3c]">Otro</option>
+          </select>
+        </div>
+        <div><label class="text-sm font-medium text-gray-300 mb-1.5 block">Cuentanos tu proyecto</label>
+          <textarea id="leadMessage" rows="3" class="w-full input-glass rounded-xl px-4 py-3 text-white text-sm outline-none transition-all resize-none" placeholder="Describe brevemente lo que necesitas..."></textarea>
+        </div>
+        <button type="submit" id="leadBtn" class="w-full py-4 bg-tdp-500 hover:bg-tdp-600 rounded-2xl text-white font-bold text-lg transition-all glow flex items-center justify-center gap-3">
+          <span id="leadBtnText">Enviar Solicitud</span>
+          <svg id="leadSpinner" class="hidden animate-spin h-5 w-5" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        </button>
+        <div id="leadSuccess" class="hidden text-center py-6">
+          <div class="text-5xl mb-4">✅</div>
+          <p class="text-xl font-bold text-green-400">¡Solicitud enviada con exito!</p>
+          <p class="text-gray-400 mt-2">Nos pondremos en contacto contigo en las proximas 24 horas.</p>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="py-16 bg-[#0a1628] border-t border-white/5">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+      <div class="flex items-center gap-3">
+        <img src="https://admin.tallerdepixeles.com/ISOTIPOTDP.png" alt="" class="h-8 w-auto brightness-0 invert">
+        <span class="text-lg font-bold">Taller de <span class="text-tdp-500">Pixeles</span></span>
+      </div>
+      <div class="flex items-center gap-6 text-sm text-gray-500">
+        <span>© 2026 Taller de Pixeles C.A.</span>
+        <span>·</span>
+        <a href="https://admin.tallerdepixeles.com" class="hover:text-tdp-400 transition-colors">Administrador</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+document.getElementById('leadForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('leadBtn');
+  const txt = document.getElementById('leadBtnText');
+  const spin = document.getElementById('leadSpinner');
+  const success = document.getElementById('leadSuccess');
+  btn.disabled = true; txt.textContent = 'Enviando...'; spin.classList.remove('hidden');
+  try {
+    const r = await fetch('/api/p/lead', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name: document.getElementById('leadName').value,
+        email: document.getElementById('leadEmail').value,
+        phone: document.getElementById('leadPhone').value,
+        company: document.getElementById('leadCompany').value,
+        service: document.getElementById('leadService').value,
+        message: document.getElementById('leadMessage').value
+      })
+    });
+    const j = await r.json();
+    if (j.ok) {
+      document.getElementById('leadForm').querySelectorAll('input,textarea,select').forEach(el => el.value = '');
+      document.getElementById('leadForm').querySelector('.space-y-5')?.classList.add('hidden');
+      success.classList.remove('hidden');
+    } else { alert('Error: ' + j.error); }
+  } catch(e) { alert('Error de conexion'); }
+  finally { btn.disabled = false; txt.textContent = 'Enviar Solicitud'; spin.classList.add('hidden'); }
+});
+</script>
+</body>
+</html>`);
+});
+
+// =============================================================================
 // Start server
 // =============================================================================
 app.listen(PORT, () => console.log("restaurantdp-server listening on", PORT));
