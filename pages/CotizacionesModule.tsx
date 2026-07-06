@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Eye, Send, CheckCircle, XCircle, X, Save, Loader2, FileText, Pencil, Share2 } from 'lucide-react';
+import { Plus, Search, Eye, Send, CheckCircle, XCircle, X, Save, Loader2, FileText, Pencil, Share2, Printer } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
 function getToken() { return localStorage.getItem('tdpadmin_auth_token'); }
@@ -24,6 +24,7 @@ export function CotizacionesModule() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [clientFilter, setClientFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editQuote, setEditQuote] = useState<any>(null);
   const [form, setForm] = useState<any>({ client_id: '', title: '', currency: 'USD', discount: 0, notes: '', valid_until: '', items: [{ description: '', quantity: 1, unit_price: 0 }] });
@@ -31,6 +32,14 @@ export function CotizacionesModule() {
   const [error, setError] = useState('');
   const [detail, setDetail] = useState<any>(null);
   const [copied, setCopied] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState<number | null>(null);
+  const [rateDate, setRateDate] = useState<string>('');
+
+  useEffect(() => {
+    api('/api/tdp/exchange-rates/latest').then(j => {
+      if (j.ok && j.rate) { setExchangeRate(Number(j.rate.rate)); setRateDate(j.rate.rate_date); }
+    });
+  }, []);
 
   const copyLink = (id: string) => {
     const link = `${window.location.origin}/api/p/view/${id}`;
@@ -42,7 +51,7 @@ export function CotizacionesModule() {
 
   const fetchQuotes = async () => {
     setLoading(true);
-    const params = new URLSearchParams({ search, status: statusFilter });
+    const params = new URLSearchParams({ search, status: statusFilter, client_id: clientFilter });
     const json = await api(`/api/tdp/quotes?${params}`);
     if (json.ok) setQuotes(json.quotes || []);
     setLoading(false);
@@ -51,7 +60,7 @@ export function CotizacionesModule() {
   useEffect(() => {
     fetchQuotes();
     api('/api/tdp/crm/clients').then(j => { if (j.ok) setClients(j.clients || []); });
-  }, [search, statusFilter]);
+  }, [search, statusFilter, clientFilter]);
 
   const openNew = () => {
     setEditQuote(null);
@@ -80,11 +89,16 @@ export function CotizacionesModule() {
   const calcSubtotal = (items: any[]) => items.reduce((s: number, it: any) => s + (Number(it.quantity) || 1) * (Number(it.unit_price) || 0), 0);
   const calcTotal = (items: any[], discount: number) => calcSubtotal(items) - Number(discount || 0);
 
+  const fmtVES = (usd: number) => {
+    if (!exchangeRate) return null;
+    return (usd * exchangeRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.client_id) { setError('Selecciona un cliente'); return; }
     setSaving(true); setError('');
-    const body = { ...form, discount: Number(form.discount) || 0 };
+    const body = { ...form, discount: Number(form.discount) || 0, exchange_rate: exchangeRate };
     const json = editQuote
       ? await api(`/api/tdp/quotes/${editQuote.id}`, { method: 'PATCH', body: JSON.stringify(body) })
       : await api('/api/tdp/quotes', { method: 'POST', body: JSON.stringify(body) });
@@ -95,9 +109,19 @@ export function CotizacionesModule() {
 
   const handleAction = async (id: string, action: string) => {
     const json = await api(`/api/tdp/quotes/${id}/${action}`, { method: 'POST' });
-    if (json.ok) { fetchQuotes(); if (detail?.id === id) setDetail(json.quote); }
+    if (json.ok) { fetchQuotes(); if (detail?.id === id) { const j = await api(`/api/tdp/quotes/${id}`); if (j.ok) setDetail(j.quote); } }
     else alert(json.error);
   };
+
+  const formatCurrency = (v: number) => v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const renderTotalRow = (total: number) => (
+    <div className="flex justify-between items-center">
+      <span className="font-bold text-gray-800">Total <span className="font-normal text-gray-500">USD</span></span>
+      <span className="text-lg font-bold font-mono text-gray-900">${formatCurrency(total)}</span>
+      {exchangeRate && <span className="text-sm font-mono text-gray-500">Bs. {fmtVES(total)}</span>}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -111,15 +135,20 @@ export function CotizacionesModule() {
         </button>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative max-w-xs">
           <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar presupuesto..." className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#009FE3]" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por # o título..." className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#009FE3]" />
         </div>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm">
-          <option value="">Todos</option>
+          <option value="">Todos los estados</option>
           {Object.keys(STATUS_COLORS).map(s => <option key={s} value={s}>{s}</option>)}
         </select>
+        <select value={clientFilter} onChange={e => setClientFilter(e.target.value)} className="border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm max-w-[200px]">
+          <option value="">Todos los clientes</option>
+          {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        {exchangeRate && <span className="text-xs text-gray-400">Tasa: Bs. {exchangeRate.toFixed(2)}</span>}
       </div>
 
       {showForm && (
@@ -143,6 +172,7 @@ export function CotizacionesModule() {
                     <option value="VES">VES</option>
                   </select></div>
               </div>
+              {exchangeRate && <p className="text-xs text-gray-400">Tasa del día ({rateDate}): 1 USD = Bs. {exchangeRate.toFixed(2)}</p>}
               <div><label className="text-xs font-semibold text-gray-700 mb-1 block">Título / Concepto</label>
                 <input type="text" value={form.title} onChange={e => setForm((f: any) => ({ ...f, title: e.target.value }))} className="w-full border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm focus:outline-none focus:border-[#009FE3]" placeholder="Ej: Diseño y desarrollo de sitio web corporativo" /></div>
 
@@ -163,7 +193,8 @@ export function CotizacionesModule() {
                       <div className="w-28">
                         <input type="number" step="0.01" value={it.unit_price} onChange={e => updateItem(idx, 'unit_price', Number(e.target.value))} className="w-full border border-gray-200 rounded-lg py-1.5 px-2.5 text-sm text-right focus:outline-none focus:border-[#009FE3]" />
                       </div>
-                      <div className="w-24 text-right text-sm font-mono font-semibold text-gray-700">${((Number(it.quantity) || 1) * (Number(it.unit_price) || 0)).toFixed(2)}</div>
+                      <div className="w-24 text-right text-sm font-mono font-semibold text-gray-700">${formatCurrency((Number(it.quantity) || 1) * (Number(it.unit_price) || 0))}</div>
+                      <div className="w-28 text-right text-xs font-mono text-gray-400">{exchangeRate ? `Bs. ${fmtVES((Number(it.quantity) || 1) * (Number(it.unit_price) || 0))}` : ''}</div>
                       {form.items.length > 1 && <button type="button" onClick={() => removeItem(idx)} className="text-gray-400 hover:text-red-500">&times;</button>}
                     </div>
                   ))}
@@ -176,8 +207,8 @@ export function CotizacionesModule() {
                       <input type="date" value={form.valid_until} onChange={e => setForm((f: any) => ({ ...f, valid_until: e.target.value }))} className="w-36 border border-gray-200 rounded-lg py-1.5 px-2.5 text-sm focus:outline-none focus:border-[#009FE3]" /></div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-gray-500">Subtotal: <span className="font-mono font-semibold">${calcSubtotal(form.items).toFixed(2)}</span></p>
-                    <p className="text-lg font-bold text-gray-800">Total: <span className="font-mono">${calcTotal(form.items, form.discount).toFixed(2)}</span></p>
+                    <p className="text-xs text-gray-500">Subtotal: <span className="font-mono">${formatCurrency(calcSubtotal(form.items))}</span></p>
+                    {renderTotalRow(calcTotal(form.items, form.discount))}
                   </div>
                 </div>
               </div>
@@ -202,39 +233,51 @@ export function CotizacionesModule() {
               <button onClick={() => setDetail(null)} className="p-1 hover:bg-gray-100 rounded-lg"><X size={20} className="text-gray-400" /></button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_COLORS[detail.status] || 'bg-gray-100'}`}>{detail.status}</span>
                 <span className="text-xs text-gray-500">{detail.currency}</span>
                 {detail.valid_until && <span className="text-xs text-gray-400">Válido hasta: {detail.valid_until?.split('T')[0]}</span>}
+                {detail.exchange_rate && <span className="text-xs text-gray-400">Tasa: Bs. {Number(detail.exchange_rate).toFixed(2)}</span>}
               </div>
               <table className="w-full">
                 <thead><tr className="border-b border-gray-100">
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-3">Descripción</th>
                   <th className="text-right text-xs font-semibold text-gray-500 px-3 py-3">Cant.</th>
-                  <th className="text-right text-xs font-semibold text-gray-500 px-3 py-3">Precio</th>
-                  <th className="text-right text-xs font-semibold text-gray-500 px-3 py-3">Total</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 px-3 py-3">Precio USD</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 px-3 py-3">Total USD</th>
+                  {detail.exchange_rate && <th className="text-right text-xs font-semibold text-gray-500 px-3 py-3">Total Bs.</th>}
                 </tr></thead>
                 <tbody>
-                  {(detail.items || []).map((it: any) => (
-                    <tr key={it.id} className="border-b border-gray-50">
-                      <td className="px-3 py-3 text-sm text-gray-800">{it.description}</td>
-                      <td className="px-3 py-3 text-right text-sm font-mono">{Number(it.quantity).toFixed(2)}</td>
-                      <td className="px-3 py-3 text-right text-sm font-mono">${Number(it.unit_price).toFixed(2)}</td>
-                      <td className="px-3 py-3 text-right text-sm font-mono font-semibold">${Number(it.total_price).toFixed(2)}</td>
-                    </tr>
-                  ))}
+                  {(detail.items || []).map((it: any) => {
+                    const totalUSD = Number(it.total_price);
+                    return (
+                      <tr key={it.id} className="border-b border-gray-50">
+                        <td className="px-3 py-3 text-sm text-gray-800">{it.description}</td>
+                        <td className="px-3 py-3 text-right text-sm font-mono">{Number(it.quantity).toFixed(2)}</td>
+                        <td className="px-3 py-3 text-right text-sm font-mono">${formatCurrency(Number(it.unit_price))}</td>
+                        <td className="px-3 py-3 text-right text-sm font-mono font-semibold">${formatCurrency(totalUSD)}</td>
+                        {detail.exchange_rate && <td className="px-3 py-3 text-right text-sm font-mono text-gray-600">Bs. {(totalUSD * Number(detail.exchange_rate)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</td>}
+                      </tr>
+                    );
+                  })}
                 </tbody>
                 <tfoot>
                   {Number(detail.discount) > 0 && <tr><td colSpan={3} className="px-3 py-2 text-right text-sm text-gray-500">Descuento</td>
-                    <td className="px-3 py-2 text-right text-sm font-mono text-red-500">-${Number(detail.discount).toFixed(2)}</td></tr>}
+                    <td className="px-3 py-2 text-right text-sm font-mono text-red-500">-${formatCurrency(Number(detail.discount))}</td>
+                    {detail.exchange_rate && <td></td>}</tr>}
                   <tr className="font-bold text-gray-800"><td colSpan={3} className="px-3 py-3 text-right">Total</td>
-                    <td className="px-3 py-3 text-right font-mono text-lg">${Number(detail.total).toFixed(2)}</td></tr>
+                    <td className="px-3 py-3 text-right font-mono text-lg">${formatCurrency(Number(detail.total))}</td>
+                    {detail.exchange_rate && <td className="px-3 py-3 text-right font-mono text-base text-gray-600">Bs. {(Number(detail.total) * Number(detail.exchange_rate)).toLocaleString('es-VE', { minimumFractionDigits: 2 })}</td>}
+                  </tr>
                 </tfoot>
               </table>
               {detail.notes && <div className="text-sm text-gray-600 bg-gray-50 rounded-xl p-4">{detail.notes}</div>}
-              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 flex-wrap">
                 <button onClick={() => copyLink(detail.id)} className="flex items-center gap-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-gray-200">
                   <Share2 size={16} /> {copied ? '¡Copiado!' : 'Compartir'}
+                </button>
+                <button onClick={() => window.open(`/api/p/view/${detail.id}`, '_blank')} className="flex items-center gap-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-gray-200">
+                  <Printer size={16} /> Ver / PDF
                 </button>
                 {detail.status === 'draft' && <button onClick={() => handleAction(detail.id, 'send')} className="flex items-center gap-1 bg-[#009FE3] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#0088c4]"><Send size={16} /> Marcar enviado</button>}
                 {detail.status === 'sent' && <>
@@ -258,8 +301,8 @@ export function CotizacionesModule() {
               <th className="text-left text-xs font-semibold text-gray-500 px-6 py-4">Cliente</th>
               <th className="text-left text-xs font-semibold text-gray-500 px-6 py-4">Título</th>
               <th className="text-center text-xs font-semibold text-gray-500 px-6 py-4">Estado</th>
-              <th className="text-right text-xs font-semibold text-gray-500 px-6 py-4">Total</th>
-              <th></th>
+              <th className="text-right text-xs font-semibold text-gray-500 px-6 py-4">Total USD</th>
+              <th className="text-right text-xs font-semibold text-gray-500 px-6 py-4"></th>
             </tr></thead>
             <tbody>
               {quotes.map(q => (
@@ -268,7 +311,7 @@ export function CotizacionesModule() {
                   <td className="px-6 py-4"><span className="text-sm text-gray-600">{q.client_name}</span></td>
                   <td className="px-6 py-4"><span className="text-sm text-gray-600 truncate max-w-[200px] block">{q.title || '—'}</span></td>
                   <td className="px-6 py-4 text-center"><span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_COLORS[q.status]}`}>{q.status}</span></td>
-                  <td className="px-6 py-4 text-right"><span className="text-sm font-mono font-semibold text-gray-800">${Number(q.total).toFixed(2)}</span></td>
+                  <td className="px-6 py-4 text-right"><span className="text-sm font-mono font-semibold text-gray-800">${formatCurrency(Number(q.total))}</span></td>
                   <td className="px-6 py-4 text-right">
                     <button onClick={async () => { const j = await api(`/api/tdp/quotes/${q.id}`); if (j.ok) setDetail(j.quote); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-[#009FE3]"><Eye size={16} /></button>
                     {q.status === 'draft' && <button onClick={() => openEdit(q)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-[#009FE3]"><Pencil size={16} /></button>}

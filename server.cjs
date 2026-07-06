@@ -3233,14 +3233,17 @@ app.get("/api/p/view/:id", async (req, res) => {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Presupuesto</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<style>body{font-family:Inter,sans-serif;background:#f8f9fa}</style>
+<style>
+body{font-family:Inter,sans-serif;background:#f8f9fa}
+@media print{body{background:#fff}.no-print{display:none!important}}
+</style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4" id="app">
-<div class="text-center text-gray-400">Cargando...</div>
+<body class="min-h-screen p-4" id="app">
+<div class="text-center text-gray-400 py-20">Cargando...</div>
 <script>
 const API = window.location.origin;
-const locale = 'es-VE';
-const curr = new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD' });
+const currUSD = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
+const currVES = new Intl.NumberFormat('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2});
 
 fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop())
   .then(r => r.json())
@@ -3248,11 +3251,13 @@ fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop())
     if (!j.ok) throw new Error(j.error);
     const q = j.quote;
     const items = q.items || [];
-    const statusColors = { draft:'bg-gray-100 text-gray-600', sent:'bg-blue-100 text-blue-700', approved:'bg-green-100 text-green-700', rejected:'bg-red-100 text-red-700' };
-    const statusLabels = { draft:'Borrador', sent:'Enviado', approved:'Aprobado', rejected:'Rechazado', expired:'Vencido', cancelled:'Cancelado' };
+    const er = q.exchange_rate;
+    const statusColors = {draft:'bg-gray-100 text-gray-600',sent:'bg-blue-100 text-blue-700',approved:'bg-green-100 text-green-700',rejected:'bg-red-100 text-red-700'};
+    const statusLabels = {draft:'Borrador',sent:'Enviado',approved:'Aprobado',rejected:'Rechazado',expired:'Vencido',cancelled:'Cancelado'};
+    const hasVES = er && er > 0;
 
     document.getElementById('app').innerHTML = \`
-      <div class="w-full max-w-3xl bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+      <div class="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden" id="quote">
         <div class="p-8 border-b border-gray-100 flex items-start justify-between gap-4">
           <div>
             <h1 class="text-2xl font-bold text-gray-900">\${q.quote_number}</h1>
@@ -3264,40 +3269,46 @@ fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop())
         <div class="p-8">
           <table class="w-full">
             <thead><tr class="border-b border-gray-100">
-              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Descripción</th>
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Descripcion</th>
               <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Cant.</th>
-              <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Precio</th>
-              <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Total</th>
+              <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Precio USD</th>
+              <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Total USD</th>
+              \${hasVES ? '<th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Total Bs.</th>' : ''}
             </tr></thead>
             <tbody>
-              \${items.map(it => \`<tr class="border-b border-gray-50">
-                <td class="py-3 pr-4 text-gray-800">\${it.description}</td>
-                <td class="py-3 text-right text-gray-600 font-mono">\${Number(it.quantity).toFixed(2)}</td>
-                <td class="py-3 text-right text-gray-600 font-mono">\${curr.format(Number(it.unit_price))}</td>
-                <td class="py-3 text-right font-mono font-semibold text-gray-900">\${curr.format(Number(it.total_price))}</td>
-              </tr>\`).join('')}
+              \${items.map(it => {
+                const tusd = Number(it.total_price);
+                return \`<tr class="border-b border-gray-50">
+                  <td class="py-3 pr-4 text-gray-800">\${it.description}</td>
+                  <td class="py-3 text-right text-gray-600 font-mono">\${Number(it.quantity).toFixed(2)}</td>
+                  <td class="py-3 text-right text-gray-600 font-mono">\${currUSD.format(Number(it.unit_price))}</td>
+                  <td class="py-3 text-right font-mono font-semibold text-gray-900">\${currUSD.format(tusd)}</td>
+                  \${hasVES ? '<td class="py-3 text-right font-mono text-gray-500">Bs. ' + currVES.format(tusd * er) + '</td>' : ''}
+                </tr>\`;
+              }).join('')}
             </tbody>
-            \${Number(q.discount) > 0 ? \`<tfoot><tr><td colspan="3" class="pt-3 text-right text-gray-500">Descuento</td><td class="pt-3 text-right font-mono text-red-500">-\${curr.format(Number(q.discount))}</td></tr></tfoot>\` : ''}
-            <tfoot><tr class="font-bold text-gray-900"><td colspan="3" class="pt-3 text-right text-lg">Total</td><td class="pt-3 text-right font-mono text-lg">\${curr.format(Number(q.total))}</td></tr></tfoot>
+            \${Number(q.discount) > 0 ? '<tfoot><tr><td colspan="' + (hasVES ? 4 : 3) + '" class="pt-3 text-right text-gray-500">Descuento</td><td class="pt-3 text-right font-mono text-red-500">-' + currUSD.format(Number(q.discount)) + '</td></tr></tfoot>' : ''}
+            <tfoot><tr class="font-bold text-gray-900"><td colspan="\${hasVES ? 4 : 3}" class="pt-3 text-right text-lg">Total</td><td class="pt-3 text-right font-mono text-lg">\${currUSD.format(Number(q.total))}</td>
+              \${hasVES ? '<td class="pt-3 text-right font-mono text-base text-gray-500">Bs. ' + currVES.format(Number(q.total) * er) + '</td>' : ''}
+            </tr></tfoot>
           </table>
-          \${q.notes ? '<div class="mt-6 p-4 bg-gray-50 rounded-xl text-sm text-gray-600">' + q.notes.replace(/\n/g, '<br>') + '</div>' : ''}
-          \${q.valid_until ? '<p class="mt-4 text-sm text-gray-400">Válido hasta: ' + q.valid_until.split('T')[0] + '</p>' : ''}
+          \${q.notes ? '<div class="mt-6 p-4 bg-gray-50 rounded-xl text-sm text-gray-600">' + q.notes.replace(/\\n/g,'<br>') + '</div>' : ''}
+          \${q.valid_until ? '<p class="mt-4 text-sm text-gray-400">Valido hasta: ' + q.valid_until.split('T')[0] + '</p>' : ''}
+          \${hasVES ? '<p class="mt-2 text-xs text-gray-400">Tasa de cambio: 1 USD = Bs. ' + Number(er).toFixed(2) + '</p>' : ''}
         </div>
-        \${q.status === 'sent' ? \`
-        <div class="p-8 bg-gray-50 border-t border-gray-100">
-          <p class="text-sm text-gray-600 mb-4 text-center">¿Qué deseas hacer con este presupuesto?</p>
-          <div class="flex flex-col sm:flex-row gap-3 justify-center">
-            <button onclick="doAction('approve')" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-xl transition-all text-center">Aprobar</button>
-            <button onclick="promptReject()" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-xl transition-all text-center">Rechazar</button>
-            <button onclick="promptChanges()" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-xl transition-all text-center">Solicitar cambio</button>
-          </div>
-          <div id="actionMsg" class="mt-4 text-center text-sm"></div>
+        <div class="no-print p-8 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-3 justify-center">
+          <button onclick="window.print()" class="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-semibold text-sm transition-all">🖨️ Descargar PDF</button>
+          \${q.status === 'sent' ? \`
+            <button onclick="doAction('approve')" class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-semibold text-sm transition-all">Aprobar</button>
+            <button onclick="promptReject()" class="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold text-sm transition-all">Rechazar</button>
+            <button onclick="promptChanges()" class="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold text-sm transition-all">Solicitar cambio</button>
+          \` : ''}
         </div>
-        \` : ''}
+        <div id="actionMsg" class="no-print text-center text-sm p-4"></div>
       </div>
     \`;
   })
-  .catch(e => { document.getElementById('app').innerHTML = '<div class="text-center text-red-500">Error: ' + e.message + '</div>'; });
+  .catch(e => { document.getElementById('app').innerHTML = '<div class="text-center text-red-500 py-20">Error: ' + e.message + '</div>'; });
 
 function doAction(action) {
   fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop() + '/' + action, { method:'POST' })
@@ -3314,7 +3325,7 @@ function promptReject() {
 }
 
 function promptChanges() {
-  const msg = prompt('Describe qué cambios necesitas:');
+  const msg = prompt('Describe que cambios necesitas:');
   if (!msg) return;
   fetch(API + '/api/p/quotes/' + location.pathname.split('/').pop() + '/request-changes', {
     method:'POST', headers:{'Content-Type':'application/json'},
