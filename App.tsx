@@ -536,6 +536,14 @@ export default function App() {
   };
 
   useEffect(() => {
+    // Auto-login from demo token
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
+    if (urlToken) {
+      localStorage.setItem('tdpadmin_auth_token', urlToken);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     tdpAuth.getMe().then(({ data: user }) => {
       if (user) {
         setSession({ user: { id: user.id, email: user.email, role: user.role, name: user.full_name } });

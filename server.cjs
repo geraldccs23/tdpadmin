@@ -4796,6 +4796,21 @@ app.get("/", (req, res) => {
   res.sendFile("index.html", { root: "public" });
 });
 
+// Demo login (no auth required)
+app.get("/api/demo/login", async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      "SELECT id, email, password_hash, full_name, role FROM tdpadmin.users WHERE email = 'demo@tallerdepixeles.com' LIMIT 1"
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "demo user not found. Run seed-demo.sql first." });
+    const user = rows[0];
+    const token = generateTDPToken(user);
+    res.redirect(`https://admin.tallerdepixeles.com?token=${token}`);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
 // Legacy redirect
 app.get("/api/p/landing", (req, res) => {
   res.redirect(301, "/");
