@@ -4802,10 +4802,9 @@ app.get("/api/demo/login", async (req, res) => {
     const { rows } = await tdpPool.query(
       "SELECT id, email, password_hash, full_name, role FROM tdpadmin.users WHERE email = 'demo@tallerdepixeles.com' LIMIT 1"
     );
-    if (rows.length === 0) return res.status(404).json({ ok: false, error: "demo user not found. Run seed-demo.sql first." });
-    const user = rows[0];
-    const token = generateTDPToken(user);
-    res.redirect(`https://admin.tallerdepixeles.com?token=${token}`);
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "demo user not found" });
+    const token = generateTDPToken(rows[0]);
+    res.json({ ok: true, token, redirect: "https://admin.tallerdepixeles.com" });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
