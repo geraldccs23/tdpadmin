@@ -31,6 +31,9 @@ import {
   ClipboardList,
   Briefcase,
   FileText,
+  UtensilsCrossed,
+  CookingPot,
+  ScrollText,
 } from "lucide-react";
 import { dbService } from "./services/dbService";
 import { auth } from "./services/auth";
@@ -166,7 +169,8 @@ export type Role =
   | "finance"
   | "client"
   | "project_manager"
-  | "developer";
+  | "developer"
+  | "restaurant";
 
 const rolePermissions: Record<Role, View[]> = {
   director: [
@@ -411,6 +415,21 @@ const rolePermissions: Record<Role, View[]> = {
   developer: [
     "support_tdp",
   ],
+  restaurant: [
+    "dashboard_restaurant",
+    "menu_management",
+    "public_menu",
+    "pos",
+    "orders",
+    "kitchen_panel",
+    "ingredients",
+    "recipes",
+    "inventory_products",
+    "suppliers",
+    "purchase_orders",
+    "purchases",
+    "support_tdp",
+  ],
 };
 
 const defaultViews: Record<Role, View> = {
@@ -436,6 +455,7 @@ const defaultViews: Record<Role, View> = {
   finance: "support_tdp",
   project_manager: "support_tdp",
   developer: "support_tdp",
+  restaurant: "dashboard_restaurant",
 };
 
 interface NavItemProps {
@@ -489,7 +509,7 @@ export default function App() {
   const [savingRate, setSavingRate] = useState(false);
 
   const fetchUserRole = async (userId: string | null, email: string, presetRole?: string) => {
-    if (presetRole && ['director','supervisor','supervisor_ventas','supervisor_compras','administrador','cajero','vendedor','compras','soporte','delivery','supervisor_almacen','almacenista','admin','cocina','superadmin','support','sales','staff','finance','client','director','project_manager','developer'].includes(presetRole)) {
+    if (presetRole && ['director','supervisor','supervisor_ventas','supervisor_compras','administrador','cajero','vendedor','compras','soporte','delivery','supervisor_almacen','almacenista','admin','cocina','superadmin','support','sales','staff','finance','client','project_manager','developer','restaurant'].includes(presetRole)) {
       setUserRole(presetRole as Role);
       return;
     }
@@ -702,7 +722,7 @@ export default function App() {
             activeView={activeView}
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
-            allowedRoles={["superadmin", "admin", "supervisor", "cocina", "cajero", "compras"]}
+            allowedRoles={["superadmin", "admin", "supervisor", "cocina", "cajero", "compras", "restaurant"]}
             userRole={userRole}
             perm="dashboard.view"
             userPermissions={permissions}
@@ -790,9 +810,124 @@ export default function App() {
             activeView={activeView}
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
-            allowedRoles={["superadmin", "admin", "support", "sales", "staff", "finance", "client"]}
+            allowedRoles={["superadmin", "admin", "support", "sales", "staff", "finance", "client", "restaurant"]}
             userRole={userRole}
           />
+
+          {userRole === "restaurant" && (
+            <>
+          <NavItem
+            icon={UtensilsCrossed}
+            label="Menú"
+            view="menu_management"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["restaurant"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={ShoppingCart}
+            label="POS / Pedidos"
+            view="pos"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["restaurant"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={ClipboardList}
+            label="Lista Pedidos"
+            view="orders"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["restaurant"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={CookingPot}
+            label="Cocina"
+            view="kitchen_panel"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["restaurant"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={Package}
+            label="Ingredientes"
+            view="ingredients"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["restaurant"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={ScrollText}
+            label="Recetas"
+            view="recipes"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["restaurant"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={Package}
+            label="Inventario"
+            view="inventory_products"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["restaurant"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={Truck}
+            label="Proveedores"
+            view="suppliers"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["restaurant"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={ClipboardList}
+            label="Órdenes de Compra"
+            view="purchase_orders"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["restaurant"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={Truck}
+            label="Recepciones"
+            view="purchases"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["restaurant"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={Globe}
+            label="Menú Público"
+            view="public_menu"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["restaurant"]}
+            userRole={userRole}
+          />
+            </>
+          )}
 
           {(userRole === "superadmin" || userRole === "admin") && (
             <>
@@ -836,7 +971,7 @@ export default function App() {
             </>
           )}
 
-          {userRole !== "superadmin" && userRole !== "admin" && userRole !== "cocina" && userRole !== "support" && userRole !== "sales" && userRole !== "staff" && userRole !== "finance" && userRole !== "client" && (
+          {userRole !== "superadmin" && userRole !== "admin" && userRole !== "cocina" && userRole !== "support" && userRole !== "sales" && userRole !== "staff" && userRole !== "finance" && userRole !== "client" && userRole !== "restaurant" && (
           <>
           {/* ======================= PROFIT PLUS ======================= */}
           <div className="pb-2 mb-2">
