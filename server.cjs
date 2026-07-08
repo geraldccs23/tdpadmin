@@ -4785,6 +4785,41 @@ app.post("/api/p/lead", async (req, res) => {
 
 
 // =============================================================================
+// TDP Connect Leads
+// =============================================================================
+
+// GET /api/tdp/connect/leads
+app.get("/api/tdp/connect/leads", requireTDPAuth, async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      "SELECT id, name, email, phone, company_name, interest, notes, source, status, estimated_budget, created_at FROM tdpadmin.clients WHERE interest ILIKE '%TDP Connect%' OR source = 'web' ORDER BY created_at DESC"
+    );
+    res.json({ ok: true, leads: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/tdp/connect/leads/:id
+app.patch("/api/tdp/connect/leads/:id", requireTDPAuth, async (req, res) => {
+  try {
+    const { status, notes } = req.body || {};
+    const sets = []; const params = []; let idx = 0;
+    if (status !== undefined) { idx++; sets.push(`status = $${idx}`); params.push(status); }
+    if (notes !== undefined) { idx++; sets.push(`notes = $${idx}`); params.push(notes); }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields" });
+    idx++; params.push(req.params.id);
+    const { rows } = await tdpPool.query(
+      `UPDATE tdpadmin.clients SET ${sets.join(', ')} WHERE id = $${idx} RETURNING id, name, email, phone, company_name, interest, notes, source, status, created_at`, params
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, lead: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// =============================================================================
 // Start server
 // =============================================================================
 

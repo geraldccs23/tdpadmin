@@ -89,6 +89,7 @@ import { Ingredients } from "./pages/Ingredients";
 import { Recipes } from "./pages/Recipes";
 import { Users as UsersPage } from "./pages/Users";
 import { InventoryProducts } from "./pages/InventoryProducts";
+import { TDPConnectModule } from "./pages/TDPConnectModule";
 import { CrmModule } from "./pages/CrmModule";
 import { ProyectosModule } from "./pages/ProyectosModule";
 import { CotizacionesModule } from "./pages/CotizacionesModule";
@@ -170,7 +171,8 @@ export type Role =
   | "client"
   | "project_manager"
   | "developer"
-  | "restaurant";
+  | "restaurant"
+  | "tdp_connect";
 
 const rolePermissions: Record<Role, View[]> = {
   director: [
@@ -391,6 +393,7 @@ const rolePermissions: Record<Role, View[]> = {
     "cotizaciones",
     "settings",
     "users",
+    "tdp_connect",
   ],
   support: [
     "support_tdp",
@@ -811,6 +814,16 @@ export default function App() {
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
             allowedRoles={["superadmin", "admin", "support", "sales", "staff", "finance", "client", "restaurant"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={TrendingUp}
+            label="TDP Connect"
+            view="tdp_connect"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["superadmin", "admin"]}
             userRole={userRole}
           />
 
@@ -1677,6 +1690,8 @@ export default function App() {
                                                                        ? "Cotizaciones"
                                                                        : activeView === "support_tdp"
                                                                        ? "Soporte"
+                                                                       : activeView === "tdp_connect"
+                                                                       ? "TDP Connect"
                                                                        : activeView}
               </h1>
               <div className="h-4 w-px bg-gray-200 hidden sm:block"></div>
@@ -1781,6 +1796,7 @@ export default function App() {
               {activeView === "proyectos" && <ProyectosModule />}
               {activeView === "cotizaciones" && <CotizacionesModule />}
               {activeView === "support_tdp" && <SupportModule userRole={userRole || ''} />}
+              {activeView === "tdp_connect" && <TDPConnectModule />}
             </>
           )}
         </div>
