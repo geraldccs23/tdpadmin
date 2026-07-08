@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
+<title>TDP Connect — Taller de Pixeles</title>
+<meta name="description" content="Conectamos negocios. Creamos soluciones. Una experiencia creada para personas que desean conectar empresas con soluciones tecnológicas reales.">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={theme:{extend:{colors:{tdp:{50:'#e8f7ff',100:'#b3e6ff',200:'#80d6ff',300:'#4dc5ff',400:'#1ab5ff',500:'#009FE3',600:'#0088c4',700:'#0070a3',800:'#005882',900:'#004061'},purp:{50:'#f5f3ff',100:'#ede9fe',200:'#ddd6fe',300:'#c4b5fd',400:'#a78bfa',500:'#8b5cf6',600:'#7c3aed',700:'#6d28d9',800:'#5b21b6',900:'#4c1d95'}}}}}</script>
+<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+*{font-family:'Inter',sans-serif;margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:#0a0a0f;color:#fff;overflow-x:hidden}
+section{position:relative}
+.gradient-text{background:linear-gradient(135deg,#8b5cf6,#009FE3,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-size:200% 200%;animation:gradientShift 4s ease infinite}
+@keyframes gradientShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.glow-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:24px;backdrop-filter:blur(20px);transition:all .5s cubic-bezier(.16,1,.3,1)}
+.glow-card:hover{background:rgba(255,255,255,.06);border-color:rgba(139,92,246,.2);transform:translateY(-4px)}
+.reveal{opacity:0;transform:translateY(40px);transition:all .8s cubic-bezier(.16,1,.3,1)}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.reveal-delay-1{transition-delay:.1s}
+.reveal-delay-2{transition-delay:.2s}
+.reveal-delay-3{transition-delay:.3s}
+.reveal-delay-4{transition-delay:.4s}
+.hero-gradient{background:radial-gradient(ellipse 80% 60% at 50% -20%,rgba(139,92,246,.15),transparent),radial-gradient(ellipse 60% 40% at 80% 80%,rgba(0,159,227,.08),transparent),#0a0a0f}
+.btn-primary{padding:16px 40px;border-radius:100px;font-size:16px;font-weight:600;border:none;cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 20px 40px rgba(139,92,246,.25)}
+.btn-secondary{padding:16px 40px;border-radius:100px;font-size:16px;font-weight:500;border:1px solid rgba(255,255,255,.15);cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:10px;background:transparent;color:rgba(255,255,255,.7)}
+.btn-secondary:hover{border-color:rgba(255,255,255,.3);color:#fff;transform:translateY(-2px)}
+.input-field{width:100%;padding:16px 20px;border-radius:16px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#fff;font-size:15px;outline:none;transition:all .3s}
+.input-field:focus{border-color:#8b5cf6;box-shadow:0 0 0 4px rgba(139,92,246,.1)}
+.input-field::placeholder{color:rgba(255,255,255,.25)}
+.pill{display:inline-block;padding:8px 20px;border-radius:100px;font-size:14px;font-weight:500;background:rgba(139,92,246,.1);color:#a78bfa;border:1px solid rgba(139,92,246,.2)}
+@media(max-width:640px){.btn-primary,.btn-secondary{width:100%;justify-content:center;padding:14px 24px}}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="fixed top-0 w-full z-50" style="background:rgba(10,10,15,.8);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.05)">
+  <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <img src="/ISOTIPOTDP.png" alt="Taller de Pixeles" class="h-7 w-auto brightness-0 invert opacity-80">
+    </div>
+    <div class="hidden md:flex items-center gap-8">
+      <a href="#programa" class="text-sm text-gray-400 hover:text-white transition-colors">Programa</a>
+      <a href="#registro" class="btn-primary text-sm" style="padding:12px 28px;font-size:14px">Reservar mi lugar</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero-gradient min-h-screen flex items-center relative overflow-hidden pt-20">
+  <div class="max-w-7xl mx-auto px-6 py-24 relative z-10 w-full">
+    <div class="max-w-4xl mx-auto text-center">
+      <div class="reveal visible mb-6"><span class="pill">Evento exclusivo</span></div>
+      <h1 class="reveal visible text-6xl md:text-8xl font-black tracking-tight mb-6" style="line-height:1">
+        <span class="gradient-text">TDP Connect</span>
+      </h1>
+      <p class="reveal visible text-xl md:text-2xl text-gray-400 font-light mb-4" style="transition-delay:.1s">Conectamos negocios. Creamos soluciones.</p>
+      <p class="reveal visible text-base md:text-lg text-gray-500 max-w-2xl mx-auto mb-12" style="transition-delay:.2s">Una experiencia creada para personas que desean conectar empresas con soluciones tecnológicas reales.</p>
+      <div class="reveal visible flex flex-col sm:flex-row gap-4 justify-center" style="transition-delay:.3s">
+        <a href="#registro" class="btn-primary">Reservar mi lugar <span style="opacity:.6">→</span></a>
+        <a href="#programa" class="btn-secondary">Conocer el programa</a>
+      </div>
+    </div>
+  </div>
+  <div class="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="2"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
+  </div>
+</section>
+
+<!-- POR QUE EXISTE -->
+<section id="programa" class="py-32" style="background:#0a0a0f">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="max-w-3xl mx-auto">
+      <div class="reveal text-center mb-6"><span class="pill">El problema</span></div>
+      <h2 class="reveal text-4xl md:text-5xl font-bold text-center mb-12 leading-tight">¿Por qué existe <span class="gradient-text">TDP Connect</span>?</h2>
+      <div class="reveal space-y-6 text-lg text-gray-400 leading-relaxed">
+        <p>Miles de empresas todavía trabajan igual que hace diez años.</p>
+        <p>Venden únicamente por WhatsApp. Pierden clientes. No conocen sus números. No automatizan procesos. No aprovechan la Inteligencia Artificial.</p>
+        <p>Mientras el mercado cambia todos los días.</p>
+        <p class="text-xl font-semibold text-white pt-4">TDP Connect nace para conectar esas empresas con soluciones reales.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- QUIEN PUEDE -->
+<section class="py-32" style="background:rgba(139,92,246,.02);border-top:1px solid rgba(139,92,246,.06);border-bottom:1px solid rgba(139,92,246,.06)">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="text-center mb-6"><span class="pill">¿Quién puede formar parte?</span></div>
+    <h2 class="reveal text-4xl md:text-5xl font-bold text-center mb-16 leading-tight">Tú <span class="gradient-text">puedes</span> ser parte</h2>
+    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
+      <div class="reveal glow-card p-8 text-center"><div class="text-3xl font-bold text-purp-400 mb-2">01</div><h3 class="text-lg font-semibold mb-2">Contadores</h3><p class="text-sm text-gray-500">Conectas empresas con orden financiero.</p></div>
+      <div class="reveal glow-card p-8 text-center" style="transition-delay:.1s"><div class="text-3xl font-bold text-purp-400 mb-2">02</div><h3 class="text-lg font-semibold mb-2">Abogados</h3><p class="text-sm text-gray-500">Tus clientes necesitan digitalizarse.</p></div>
+      <div class="reveal glow-card p-8 text-center" style="transition-delay:.2s"><div class="text-3xl font-bold text-purp-400 mb-2">03</div><h3 class="text-lg font-semibold mb-2">Vendedores</h3><p class="text-sm text-gray-500">Multiplicas tu oferta de valor.</p></div>
+      <div class="reveal glow-card p-8 text-center" style="transition-delay:.3s"><div class="text-3xl font-bold text-purp-400 mb-2">04</div><h3 class="text-lg font-semibold mb-2">Community Managers</h3><p class="text-sm text-gray-500">Tus clientes también necesitan sistemas.</p></div>
+      <div class="reveal glow-card p-8 text-center" style="transition-delay:.1s"><div class="text-3xl font-bold text-purp-400 mb-2">05</div><h3 class="text-lg font-semibold mb-2">Diseñadores</h3><p class="text-sm text-gray-500">Tu creatividad + nuestra tecnología.</p></div>
+      <div class="reveal glow-card p-8 text-center" style="transition-delay:.2s"><div class="text-3xl font-bold text-purp-400 mb-2">06</div><h3 class="text-lg font-semibold mb-2">Consultores</h3><p class="text-sm text-gray-500">Recomiendas soluciones que funcionan.</p></div>
+      <div class="reveal glow-card p-8 text-center" style="transition-delay:.3s"><div class="text-3xl font-bold text-purp-400 mb-2">07</div><h3 class="text-lg font-semibold mb-2">Empresarios</h3><p class="text-sm text-gray-500">Conectas tu red con soluciones reales.</p></div>
+      <div class="reveal glow-card p-8 text-center" style="transition-delay:.4s"><div class="text-3xl font-bold text-purp-400 mb-2">08</div><h3 class="text-lg font-semibold mb-2">Personas con contactos</h3><p class="text-sm text-gray-500">Solo conectas. Nosotros hacemos el resto.</p></div>
+    </div>
+    <div class="reveal text-center mt-12"><p class="text-gray-500 text-lg max-w-2xl mx-auto">No necesitas programar. No necesitas vender tecnología. Solo conectar una necesidad con una solución.</p></div>
+  </div>
+</section>
+
+<!-- QUE HACE TALLER DE PIXELES -->
+<section class="py-32">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="text-center mb-6"><span class="pill">Soluciones</span></div>
+    <h2 class="reveal text-4xl md:text-5xl font-bold text-center mb-16 leading-tight">¿Qué hace <span class="gradient-text">Taller de Pixeles</span>?</h2>
+    <div class="grid md:grid-cols-3 gap-4 max-w-5xl mx-auto">
+      <div class="reveal glow-card p-8"><div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background:rgba(139,92,246,.1)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M3 12h18"/></svg></div><h3 class="text-lg font-semibold mb-2">Desarrollo Web</h3><p class="text-sm text-gray-500">Sitios institucionales, landing pages y portales corporativos.</p></div>
+      <div class="reveal glow-card p-8" style="transition-delay:.1s"><div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background:rgba(139,92,246,.1)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.5"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></div><h3 class="text-lg font-semibold mb-2">Sistemas Empresariales</h3><p class="text-sm text-gray-500">ERP, CRM, facturación, inventario, compras y más.</p></div>
+      <div class="reveal glow-card p-8" style="transition-delay:.2s"><div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background:rgba(139,92,246,.1)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><h3 class="text-lg font-semibold mb-2">Inteligencia Artificial</h3><p class="text-sm text-gray-500">Automatización inteligente, chatbots y análisis predictivo.</p></div>
+      <div class="reveal glow-card p-8" style="transition-delay:.3s"><div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background:rgba(139,92,246,.1)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg></div><h3 class="text-lg font-semibold mb-2">Tiendas Online</h3><p class="text-sm text-gray-500">Ecommerce completo con carrito, pagos e inventario.</p></div>
+      <div class="reveal glow-card p-8" style="transition-delay:.4s"><div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background:rgba(139,92,246,.1)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div><h3 class="text-lg font-semibold mb-2">Hosting</h3><p class="text-sm text-gray-500">Alojamiento web, certificados SSL y correo corporativo.</p></div>
+      <div class="reveal glow-card p-8" style="transition-delay:.5s"><div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-5" style="background:rgba(139,92,246,.1)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></div><h3 class="text-lg font-semibold mb-2">Integraciones</h3><p class="text-sm text-gray-500">WhatsApp, pasarelas de pago, APIs y automatizaciones.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL + FORM -->
+<section id="registro" class="py-32" style="background:radial-gradient(ellipse 80% 50% at 50% 50%,rgba(139,92,246,.08),transparent)">
+  <div class="max-w-3xl mx-auto px-6">
+    <div class="text-center mb-6"><span class="pill">Invitación</span></div>
+    <h2 class="reveal text-4xl md:text-5xl font-bold text-center mb-4 leading-tight">¿Quieres vivir la experiencia <span class="gradient-text">completa</span>?</h2>
+    <p class="reveal text-gray-500 text-center text-lg mb-12" style="transition-delay:.1s">Déjanos tus datos y te contactaremos con todos los detalles.</p>
+    <div class="reveal glow-card p-8 md:p-12 max-w-lg mx-auto" style="transition-delay:.2s">
+      <form id="connectForm" class="space-y-4">
+        <input type="text" id="leadName" required placeholder="Nombre completo" class="input-field">
+        <input type="text" id="leadCompany" placeholder="Empresa" class="input-field">
+        <input type="tel" id="leadPhone" placeholder="Teléfono" class="input-field">
+        <input type="email" id="leadEmail" required placeholder="Correo electrónico" class="input-field">
+        <input type="text" id="leadProfession" placeholder="Profesión / Ocupación" class="input-field">
+        <textarea id="leadMessage" rows="3" placeholder="Cuéntanos sobre ti..." class="input-field resize-none"></textarea>
+        <button type="submit" id="connectBtn" class="btn-primary w-full justify-center text-base py-4 mt-2">
+          <span id="connectBtnText">Reservar mi lugar</span>
+          <svg id="connectSpinner" class="hidden animate-spin h-5 w-5" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        </button>
+        <div id="connectSuccess" class="hidden text-center py-8">
+          <div class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6" style="background:rgba(139,92,246,.1)"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <p class="text-2xl font-bold">¡Gracias por tu interés!</p>
+          <p class="text-gray-500 mt-2">Te contactaremos con todos los detalles de TDP Connect.</p>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="py-16" style="border-top:1px solid rgba(255,255,255,.05)">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+      <img src="/ISOTIPOTDP.png" alt="Taller de Pixeles" class="h-6 w-auto brightness-0 invert opacity-40">
+      <div class="text-sm text-gray-600">© 2026 Taller de Pixeles C.A. — TDP Connect</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Intersection Observer for reveal animations
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) entry.target.classList.add('visible');
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Form submission
+document.getElementById('connectForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('connectBtn');
+  const txt = document.getElementById('connectBtnText');
+  const spin = document.getElementById('connectSpinner');
+  const success = document.getElementById('connectSuccess');
+  btn.disabled = true; txt.textContent = 'Enviando...'; spin.classList.remove('hidden');
+  try {
+    const r = await fetch('/api/p/lead', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name: document.getElementById('leadName').value,
+        email: document.getElementById('leadEmail').value,
+        phone: document.getElementById('leadPhone').value,
+        company: document.getElementById('leadCompany').value,
+        service: 'TDP Connect',
+        message: 'Profesión: ' + (document.getElementById('leadProfession').value || 'No especificada') + '. ' + (document.getElementById('leadMessage').value || '')
+      })
+    });
+    const j = await r.json();
+    if (j.ok) {
+      this.querySelectorAll('input,textarea').forEach(el => el.value = '');
+      this.querySelector('.space-y-4')?.classList.add('hidden');
+      success.classList.remove('hidden');
+    } else { alert('Error: ' + j.error); }
+  } catch(e) { alert('Error de conexión'); }
+  finally { btn.disabled = false; txt.textContent = 'Reservar mi lugar'; spin.classList.add('hidden'); }
+});
+</script>
+</body>
+</html>

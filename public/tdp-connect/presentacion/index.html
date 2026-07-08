@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
+<title>TDP Connect — Presentación</title>
+<meta name="description" content="Conectamos negocios. Creamos soluciones.">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={theme:{extend:{colors:{tdp:{50:'#e8f7ff',100:'#b3e6ff',200:'#80d6ff',300:'#4dc5ff',400:'#1ab5ff',500:'#009FE3',600:'#0088c4',700:'#0070a3',800:'#005882',900:'#004061'},purp:{50:'#f5f3ff',100:'#ede9fe',200:'#ddd6fe',300:'#c4b5fd',400:'#a78bfa',500:'#8b5cf6',600:'#7c3aed',700:'#6d28d9',800:'#5b21b6',900:'#4c1d95'}}}}}</style>
+<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+*{font-family:'Inter',sans-serif;margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;color:#fff;overflow-x:hidden}
+section{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.gradient-text{background:linear-gradient(135deg,#8b5cf6,#009FE3,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-size:200% 200%;animation:gradientShift 4s ease infinite}
+@keyframes gradientShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.glow-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:24px;backdrop-filter:blur(20px);transition:all .5s cubic-bezier(.16,1,.3,1)}
+.fade-up{opacity:0;transform:translateY(60px);transition:all 1s cubic-bezier(.16,1,.3,1)}
+.fade-up.visible{opacity:1;transform:translateY(0)}
+.fade-out{transition:all .8s cubic-bezier(.16,1,.3,1)}
+.hero-gradient{background:radial-gradient(ellipse 80% 60% at 50% -20%,rgba(139,92,246,.15),transparent),radial-gradient(ellipse 60% 40% at 80% 80%,rgba(0,159,227,.08),transparent),#0a0a0f}
+.btn-primary{padding:16px 40px;border-radius:100px;font-size:16px;font-weight:600;border:none;cursor:pointer;transition:all .3s;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;display:inline-flex;align-items:center;gap:10px;text-decoration:none}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 20px 40px rgba(139,92,246,.25)}
+.input-field{width:100%;padding:16px 20px;border-radius:16px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#fff;font-size:15px;outline:none;transition:all .3s}
+.input-field:focus{border-color:#8b5cf6;box-shadow:0 0 0 4px rgba(139,92,246,.1)}
+.input-field::placeholder{color:rgba(255,255,255,.25)}
+.pill{display:inline-block;padding:8px 20px;border-radius:100px;font-size:14px;font-weight:500;background:rgba(139,92,246,.1);color:#a78bfa;border:1px solid rgba(139,92,246,.2)}
+.timeline-line{position:absolute;left:50%;top:0;bottom:0;width:1px;background:linear-gradient(to bottom,rgba(139,92,246,.4),transparent)}
+</style>
+</head>
+<body>
+
+<!-- ===== S1: HERO FULLSCREEN ===== -->
+<section class="hero-gradient flex-col relative" style="min-height:100vh">
+  <div class="text-center fade-up visible" style="padding-top:10vh">
+    <img src="/ISOTIPOTDP.png" alt="Taller de Pixeles" class="h-12 w-auto brightness-0 invert opacity-60 mx-auto mb-12">
+    <h1 class="text-7xl md:text-9xl font-black tracking-tight mb-6" style="line-height:.9">
+      <span class="gradient-text">TDP Connect</span>
+    </h1>
+    <p class="text-xl md:text-2xl text-gray-400 font-light">Conectamos negocios. Creamos soluciones.</p>
+  </div>
+  <div class="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3" style="animation:bounce 2s infinite">
+    <span class="text-xs text-gray-600 tracking-widest uppercase">Descubre más</span>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="2"><path d="M7 13l5 5 5-5"/></svg>
+  </div>
+  <style>@keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(8px)}}</style>
+</section>
+
+<!-- ===== S2: LA PREGUNTA ===== -->
+<section id="question" class="flex-col px-6" style="min-height:80vh">
+  <div class="max-w-6xl mx-auto text-center fade-up">
+    <p class="text-4xl md:text-6xl font-bold leading-tight text-gray-300" id="questionText">
+      ¿Cuántos negocios conoces que todavía trabajan <span class="text-white">completamente manual</span>?
+    </p>
+  </div>
+</section>
+
+<!-- ===== S3: EL PROBLEMA ===== -->
+<section class="px-6" style="min-height:100vh;background:rgba(139,92,246,.02)">
+  <div class="max-w-7xl mx-auto w-full py-24">
+    <div class="fade-up text-center mb-6"><span class="pill">Realidad</span></div>
+    <h2 class="fade-up text-4xl md:text-5xl font-bold text-center mb-20" style="transition-delay:.1s">El <span class="gradient-text">problema</span></h2>
+    <div class="grid md:grid-cols-3 gap-4 max-w-5xl mx-auto">
+      <div class="fade-up glow-card p-8 text-center" style="transition-delay:.1s"><div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style="background:rgba(239,68,68,.1)"><span class="text-2xl font-bold" style="color:#ef4444">!</span></div><h3 class="text-lg font-semibold mb-2">No tienen página web</h3><p class="text-sm text-gray-500">Invisibles para el mundo digital.</p></div>
+      <div class="fade-up glow-card p-8 text-center" style="transition-delay:.2s"><div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style="background:rgba(239,68,68,.1)"><span class="text-2xl font-bold" style="color:#ef4444">!</span></div><h3 class="text-lg font-semibold mb-2">No aparecen en Google</h3><p class="text-sm text-gray-500">No existen para quienes los buscan.</p></div>
+      <div class="fade-up glow-card p-8 text-center" style="transition-delay:.3s"><div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style="background:rgba(239,68,68,.1)"><span class="text-2xl font-bold" style="color:#ef4444">!</span></div><h3 class="text-lg font-semibold mb-2">No tienen sistema</h3><p class="text-sm text-gray-500">Operan con papel, Excel o memoria.</p></div>
+      <div class="fade-up glow-card p-8 text-center" style="transition-delay:.4s"><div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style="background:rgba(239,68,68,.1)"><span class="text-2xl font-bold" style="color:#ef4444">!</span></div><h3 class="text-lg font-semibold mb-2">Pierden clientes</h3><p class="text-sm text-gray-500">Sin seguimiento ni automatización.</p></div>
+      <div class="fade-up glow-card p-8 text-center" style="transition-delay:.5s"><div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style="background:rgba(239,68,68,.1)"><span class="text-2xl font-bold" style="color:#ef4444">!</span></div><h3 class="text-lg font-semibold mb-2">No automatizan</h3><p class="text-sm text-gray-500">Hacen todo manual, una y otra vez.</p></div>
+      <div class="fade-up glow-card p-8 text-center" style="transition-delay:.6s"><div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style="background:rgba(239,68,68,.1)"><span class="text-2xl font-bold" style="color:#ef4444">!</span></div><h3 class="text-lg font-semibold mb-2">No conocen sus números</h3><p class="text-sm text-gray-500">Toman decisiones sin datos reales.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== S4: CAMBIO DE ESCENARIO ===== -->
+<section class="flex-col px-6" style="min-height:80vh;background:radial-gradient(ellipse 60% 40% at 50% 50%,rgba(139,92,246,.05),transparent)">
+  <div class="max-w-5xl mx-auto text-center fade-up">
+    <p class="text-3xl md:text-5xl font-bold leading-tight text-gray-300">
+      La transformación digital ya no es una ventaja.
+    </p>
+    <p class="text-4xl md:text-6xl font-black mt-6">
+      Es una <span class="gradient-text">necesidad</span>.
+    </p>
+  </div>
+</section>
+
+<!-- ===== S5: QUE HACE TALLER DE PIXELES ===== -->
+<section class="px-6" style="min-height:100vh">
+  <div class="max-w-7xl mx-auto w-full py-24">
+    <div class="fade-up text-center mb-6"><span class="pill">Soluciones</span></div>
+    <h2 class="fade-up text-4xl md:text-5xl font-bold text-center mb-20 leading-tight" style="transition-delay:.1s">¿Qué hace <span class="gradient-text">Taller de Pixeles</span>?</h2>
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
+      <div class="fade-up glow-card p-8 md:p-10 flex flex-col items-start" style="transition-delay:.1s"><h3 class="text-2xl font-bold mb-3" style="color:#a78bfa">Desarrollo Web</h3><p class="text-gray-500">Sitios profesionales, landing pages y portales corporativos con diseño moderno.</p></div>
+      <div class="fade-up glow-card p-8 md:p-10 flex flex-col items-start" style="transition-delay:.2s"><h3 class="text-2xl font-bold mb-3" style="color:#009FE3">ERP</h3><p class="text-gray-500">Sistemas completos de gestión empresarial con facturación, inventario y más.</p></div>
+      <div class="fade-up glow-card p-8 md:p-10 flex flex-col items-start" style="transition-delay:.3s"><h3 class="text-2xl font-bold mb-3" style="color:#a78bfa">CRM</h3><p class="text-gray-500">Gestión de clientes, prospectos, historial de ventas y automatización comercial.</p></div>
+      <div class="fade-up glow-card p-8 md:p-10 flex flex-col items-start" style="transition-delay:.4s"><h3 class="text-2xl font-bold mb-3" style="color:#009FE3">Inteligencia Artificial</h3><p class="text-gray-500">Automatización inteligente, chatbots, asistentes virtuales y análisis de datos.</p></div>
+      <div class="fade-up glow-card p-8 md:p-10 flex flex-col items-start" style="transition-delay:.5s"><h3 class="text-2xl font-bold mb-3" style="color:#a78bfa">Automatización</h3><p class="text-gray-500">Integraciones entre plataformas, flujos de trabajo automáticos y notificaciones.</p></div>
+      <div class="fade-up glow-card p-8 md:p-10 flex flex-col items-start" style="transition-delay:.6s"><h3 class="text-2xl font-bold mb-3" style="color:#009FE3">Hosting</h3><p class="text-gray-500">Alojamiento, dominios, correo corporativo, SSL y soporte técnico continuo.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== S6: DEMOS ===== -->
+<section class="px-6" style="min-height:80vh;background:rgba(139,92,246,.02)">
+  <div class="max-w-7xl mx-auto w-full py-24">
+    <div class="fade-up text-center mb-6"><span class="pill">En vivo</span></div>
+    <h2 class="fade-up text-4xl md:text-5xl font-bold text-center mb-8 leading-tight" style="transition-delay:.1s">Ver para <span class="gradient-text">creer</span></h2>
+    <p class="fade-up text-gray-500 text-center text-lg mb-16 max-w-2xl mx-auto" style="transition-delay:.2s">Explora el sistema completo en acción con datos reales.</p>
+    <div class="fade-up glow-card p-8 md:p-12 max-w-4xl mx-auto text-center" style="transition-delay:.3s">
+      <a href="/api/demo/login" class="btn-primary text-lg mb-6">Explorar Demo en vivo →</a>
+      <p class="text-sm text-gray-600 mt-4">Sin registro. Sin compromiso. Datos de prueba.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== S7: TIMELINE ===== -->
+<section class="px-6" style="min-height:100vh">
+  <div class="max-w-4xl mx-auto w-full py-24">
+    <div class="fade-up text-center mb-6"><span class="pill">Proceso</span></div>
+    <h2 class="fade-up text-4xl md:text-5xl font-bold text-center mb-20 leading-tight" style="transition-delay:.1s">¿Cómo <span class="gradient-text">funciona</span>?</h2>
+    <div class="relative">
+      <div class="timeline-line"></div>
+      <div class="space-y-24">
+        <div class="fade-up relative pl-12 md:pl-16" style="transition-delay:.1s"><div class="absolute left-0 top-1 w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3)"><span class="text-sm font-bold" style="color:#a78bfa">1</span></div><h3 class="text-xl font-bold mb-2">Conoces una empresa</h3><p class="text-gray-500">Identificas un negocio que necesita soluciones digitales.</p></div>
+        <div class="fade-up relative pl-12 md:pl-16" style="transition-delay:.2s"><div class="absolute left-0 top-1 w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3)"><span class="text-sm font-bold" style="color:#a78bfa">2</span></div><h3 class="text-xl font-bold mb-2">Registras el prospecto</h3><p class="text-gray-500">Ingresas los datos en el sistema y activas la oportunidad.</p></div>
+        <div class="fade-up relative pl-12 md:pl-16" style="transition-delay:.3s"><div class="absolute left-0 top-1 w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3)"><span class="text-sm font-bold" style="color:#a78bfa">3</span></div><h3 class="text-xl font-bold mb-2">Taller de Pixeles realiza el diagnóstico</h3><p class="text-gray-500">Analizamos los procesos y necesidades reales del negocio.</p></div>
+        <div class="fade-up relative pl-12 md:pl-16" style="transition-delay:.4s"><div class="absolute left-0 top-1 w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3)"><span class="text-sm font-bold" style="color:#a78bfa">4</span></div><h3 class="text-xl font-bold mb-2">Creamos la propuesta</h3><p class="text-gray-500">Preparamos un presupuesto claro con alcance, tiempos y costos.</p></div>
+        <div class="fade-up relative pl-12 md:pl-16" style="transition-delay:.5s"><div class="absolute left-0 top-1 w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3)"><span class="text-sm font-bold" style="color:#a78bfa">5</span></div><h3 class="text-xl font-bold mb-2">Implementamos la solución</h3><p class="text-gray-500">Desarrollamos, probamos y entregamos el proyecto funcionando.</p></div>
+        <div class="fade-up relative pl-12 md:pl-16" style="transition-delay:.6s"><div class="absolute left-0 top-1 w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3)"><span class="text-sm font-bold" style="color:#a78bfa">6</span></div><h3 class="text-xl font-bold mb-2">El Partner recibe su comisión</h3><p class="text-gray-500">Todo se registra, tracking completo y pago automático.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== S8: PANEL DEL PARTNER ===== -->
+<section class="px-6" style="min-height:100vh;background:rgba(139,92,246,.02)">
+  <div class="max-w-7xl mx-auto w-full py-24">
+    <div class="fade-up text-center mb-6"><span class="pill">Panel Partner</span></div>
+    <h2 class="fade-up text-4xl md:text-5xl font-bold text-center mb-6 leading-tight" style="transition-delay:.1s">Tu <span class="gradient-text">panel</span> de control</h2>
+    <p class="fade-up text-gray-500 text-center text-lg mb-16 max-w-2xl mx-auto" style="transition-delay:.2s">Todo lo que necesitas para gestionar tus referidos desde un solo lugar.</p>
+    <div class="fade-up glow-card p-8 md:p-12" style="transition-delay:.3s">
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-6 mb-10">
+        <div class="text-center"><div class="text-3xl font-bold" style="color:#a78bfa">12</div><p class="text-xs text-gray-500 mt-1">Prospectos</p></div>
+        <div class="text-center"><div class="text-3xl font-bold" style="color:#009FE3">8</div><p class="text-xs text-gray-500 mt-1">Presupuestos</p></div>
+        <div class="text-center"><div class="text-3xl font-bold" style="color:#a78bfa">5</div><p class="text-xs text-gray-500 mt-1">Proyectos</p></div>
+        <div class="text-center"><div class="text-3xl font-bold" style="color:#7AB800">$2,450</div><p class="text-xs text-gray-500 mt-1">Comisiones</p></div>
+        <div class="text-center"><div class="text-3xl font-bold" style="color:#a78bfa">#3</div><p class="text-xs text-gray-500 mt-1">Ranking</p></div>
+      </div>
+      <div style="background:rgba(255,255,255,.03);border-radius:16px;padding:24px;border:1px solid rgba(255,255,255,.05)">
+        <p class="text-sm text-gray-400 mb-4">Últimos prospectos registrados</p>
+        <div class="space-y-3">
+          <div class="flex items-center justify-between py-3" style="border-bottom:1px solid rgba(255,255,255,.05)"><div><p class="text-sm font-medium">Distribuidora Mendoza</p><p class="text-xs text-gray-600">Carlos Mendoza</p></div><span class="text-xs px-3 py-1 rounded-full" style="background:rgba(139,92,246,.1);color:#a78bfa">Presupuesto enviado</span></div>
+          <div class="flex items-center justify-between py-3" style="border-bottom:1px solid rgba(255,255,255,.05)"><div><p class="text-sm font-medium">Clínica Dental Silva</p><p class="text-xs text-gray-600">Ana Silva</p></div><span class="text-xs px-3 py-1 rounded-full" style="background:rgba(16,185,129,.1);color:#10b981">Proyecto activo</span></div>
+          <div class="flex items-center justify-between py-3"><div><p class="text-sm font-medium">Tech Solutions CA</p><p class="text-xs text-gray-600">Pedro Torres</p></div><span class="text-xs px-3 py-1 rounded-full" style="background:rgba(251,191,36,.1);color:#fbbf24">Nuevo lead</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== S9: QUE HACE UN PARTNER ===== -->
+<section class="px-6" style="min-height:80vh">
+  <div class="max-w-5xl mx-auto w-full py-24">
+    <div class="fade-up text-center mb-6"><span class="pill">Rol del Partner</span></div>
+    <h2 class="fade-up text-4xl md:text-5xl font-bold text-center mb-16 leading-tight" style="transition-delay:.1s">¿Qué hace un <span class="gradient-text">Partner</span>?</h2>
+    <div class="grid md:grid-cols-2 gap-8">
+      <div class="fade-up glow-card p-8 md:p-10" style="transition-delay:.2s;border-color:rgba(16,185,129,.15)"><h3 class="text-lg font-bold mb-4 flex items-center gap-3"><span class="w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(16,185,129,.1)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span> Puede</h3><ul class="space-y-3 text-gray-400"><li>✓ Presentar las soluciones de TDP a sus contactos</li><li>✓ Conectar empresas con necesidades reales</li><li>✓ Dar seguimiento a las oportunidades</li><li>✓ Registrar prospectos en el sistema</li><li>✓ Recibir comisiones por proyectos cerrados</li></ul></div>
+      <div class="fade-up glow-card p-8 md:p-10" style="transition-delay:.3s;border-color:rgba(239,68,68,.15)"><h3 class="text-lg font-bold mb-4 flex items-center gap-3"><span class="w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(239,68,68,.1)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span> No puede</h3><ul class="space-y-3 text-gray-400"><li>✗ Prometer precios sin autorización</li><li>✗ Modificar propuestas técnicas</li><li>✗ Negociar condiciones sin aprobación</li><li>✗ Cerrar contratos sin validación de TDP</li><li>✗ Comprometer entregas sin revisión previa</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== S10: CIERRE ===== -->
+<section class="flex-col px-6" style="min-height:100vh;background:radial-gradient(ellipse 60% 40% at 50% 50%,rgba(139,92,246,.08),transparent)">
+  <div class="max-w-4xl mx-auto text-center fade-up">
+    <img src="/ISOTIPOTDP.png" alt="Taller de Pixeles" class="h-12 w-auto brightness-0 invert opacity-40 mx-auto mb-12">
+    <p class="text-2xl md:text-3xl text-gray-400 leading-relaxed mb-12 max-w-3xl">
+      Las mejores oportunidades nacen cuando conectamos a las personas correctas con las soluciones correctas.
+    </p>
+    <h2 class="text-5xl md:text-7xl font-black mb-12">
+      <span class="gradient-text">TDP Connect</span>
+    </h2>
+    <a href="#registro" class="btn-primary text-lg">Quiero formar parte de TDP Connect →</a>
+  </div>
+</section>
+
+<!-- ===== FORMULARIO FINAL ===== -->
+<section id="registro" class="px-6" style="min-height:100vh">
+  <div class="max-w-3xl mx-auto w-full py-24">
+    <div class="fade-up text-center mb-6"><span class="pill">Únete</span></div>
+    <h2 class="fade-up text-4xl md:text-5xl font-bold text-center mb-6 leading-tight" style="transition-delay:.1s">Forma parte de <span class="gradient-text">TDP Connect</span></h2>
+    <p class="fade-up text-gray-500 text-center text-lg mb-12 max-w-xl mx-auto" style="transition-delay:.2s">Déjanos tus datos y te explicaremos cómo puedes empezar a conectar negocios con soluciones reales.</p>
+    <div class="fade-up glow-card p-8 md:p-12 max-w-lg mx-auto" style="transition-delay:.3s">
+      <form id="connectForm" class="space-y-4">
+        <input type="text" id="leadName" required placeholder="Nombre completo" class="input-field">
+        <input type="text" id="leadCompany" placeholder="Empresa" class="input-field">
+        <input type="tel" id="leadPhone" placeholder="Teléfono" class="input-field">
+        <input type="email" id="leadEmail" required placeholder="Correo electrónico" class="input-field">
+        <input type="text" id="leadProfession" placeholder="Profesión / Ocupación" class="input-field">
+        <textarea id="leadMessage" rows="3" placeholder="Cuéntanos sobre ti y tu red de contactos..." class="input-field resize-none"></textarea>
+        <button type="submit" id="connectBtn" class="btn-primary w-full justify-center text-base py-4 mt-2">
+          <span id="connectBtnText">Quiero ser Partner</span>
+          <svg id="connectSpinner" class="hidden animate-spin h-5 w-5" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        </button>
+        <div id="connectSuccess" class="hidden text-center py-8">
+          <div class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6" style="background:rgba(139,92,246,.1)"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <p class="text-2xl font-bold">¡Gracias por sumarte!</p>
+          <p class="text-gray-500 mt-2">Te contactaremos con toda la información del programa TDP Connect.</p>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="py-16" style="border-top:1px solid rgba(255,255,255,.05)">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+      <img src="/ISOTIPOTDP.png" alt="Taller de Pixeles" class="h-6 w-auto brightness-0 invert opacity-40">
+      <div class="text-sm text-gray-600">© 2026 Taller de Pixeles C.A. — TDP Connect</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Intersection Observer
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) entry.target.classList.add('visible');
+  });
+}, { threshold: 0.1 });
+document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+
+// Fade out effect on question section
+const questionSection = document.getElementById('question');
+const questionText = document.getElementById('questionText');
+if (questionSection && questionText) {
+  const qObserver = new IntersectionObserver(([entry]) => {
+    const ratio = entry.intersectionRatio;
+    questionText.style.opacity = Math.max(0, ratio * 2 - 0.5);
+    questionText.style.transform = `translateY(${(1 - ratio) * 100}px)`;
+  }, { threshold: Array.from({length: 20}, (_, i) => i / 20) });
+  qObserver.observe(questionSection);
+}
+
+// Form submission
+document.getElementById('connectForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('connectBtn');
+  const txt = document.getElementById('connectBtnText');
+  const spin = document.getElementById('connectSpinner');
+  const success = document.getElementById('connectSuccess');
+  btn.disabled = true; txt.textContent = 'Enviando...'; spin.classList.remove('hidden');
+  try {
+    const r = await fetch('/api/p/lead', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name: document.getElementById('leadName').value,
+        email: document.getElementById('leadEmail').value,
+        phone: document.getElementById('leadPhone').value,
+        company: document.getElementById('leadCompany').value,
+        service: 'TDP Connect Partner',
+        message: 'Profesión: ' + (document.getElementById('leadProfession').value || '') + '. ' + (document.getElementById('leadMessage').value || '')
+      })
+    });
+    const j = await r.json();
+    if (j.ok) {
+      this.querySelectorAll('input,textarea').forEach(el => el.value = '');
+      this.querySelector('.space-y-4')?.classList.add('hidden');
+      success.classList.remove('hidden');
+    } else { alert('Error: ' + j.error); }
+  } catch(e) { alert('Error de conexión'); }
+  finally { btn.disabled = false; txt.textContent = 'Quiero ser Partner'; spin.classList.add('hidden'); }
+});
+</script>
+</body>
+</html>
