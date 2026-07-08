@@ -4820,6 +4820,149 @@ app.patch("/api/tdp/connect/leads/:id", requireTDPAuth, async (req, res) => {
 });
 
 // =============================================================================
+// TDP Admin Partners
+// =============================================================================
+
+// GET /api/tdp/partners/dashboard — partner's own dashboard
+app.get("/api/tdp/partners/dashboard", requireTDPAuth, async (req, res) => {
+  try {
+    const uid = req.tdpUser.id;
+    const clientLeads = await tdpPool.query(
+      "SELECT COUNT(*) AS total FROM tdpadmin.clients WHERE created_by = $1", [uid]
+    );
+    const commissions = await tdpPool.query(
+      "SELECT COUNT(*) FILTER (WHERE status = 'pending') AS pending, COALESCE(SUM(commission_amount) FILTER (WHERE status IN ('approved','paid')), 0) AS earned FROM tdpadmin.commissions WHERE partner_id = $1", [uid]
+    );
+    const ranking = await tdpPool.query(
+      "SELECT partner_id, SUM(commission_amount) AS total FROM tdpadmin.commissions WHERE status IN ('approved','paid') GROUP BY partner_id ORDER BY total DESC"
+    );
+    const rank = ranking.rows.findIndex(r => r.partner_id === uid) + 1;
+    res.json({ ok: true, dashboard: {
+      total_leads: Number(clientLeads.rows[0].total),
+      pending_commissions: Number(commissions.rows[0].pending),
+      total_earned: Number(commissions.rows[0].earned),
+      ranking: rank > 0 ? rank : ranking.rows.length + 1,
+    }});
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/tdp/partners/commission — partner's commission list
+app.get("/api/tdp/partners/commission", requireTDPAuth, async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      "SELECT * FROM tdpadmin.commissions WHERE partner_id = $1 ORDER BY created_at DESC",
+      [req.tdpUser.id]
+    );
+    res.json({ ok: true, commissions: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/tdp/partners/profile — partner's own profile
+app.get("/api/tdp/partners/profile", requireTDPAuth, async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      "SELECT id, email, full_name, role, referral_code, bank_name, bank_account_type, bank_account_number, bank_document_id, bank_phone, commission_rate, created_at FROM tdpadmin.users WHERE id = $1",
+      [req.tdpUser.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, profile: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/tdp/partners/profile — update own profile
+app.patch("/api/tdp/partners/profile", requireTDPAuth, async (req, res) => {
+  try {
+    const allowed = ['full_name', 'bank_name', 'bank_account_type', 'bank_account_number', 'bank_document_id', 'bank_phone'];
+    const sets = []; const params = []; let idx = 0;
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) { idx++; sets.push(`${key} = $${idx}`); params.push(req.body[key]); }
+    }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields" });
+    idx++; params.push(req.tdpUser.id);
+    const { rows } = await tdpPool.query(
+      `UPDATE tdpadmin.users SET ${sets.join(', ')} WHERE id = $${idx} RETURNING id, email, full_name, role, referral_code, bank_name, bank_account_type, bank_account_number, bank_document_id, bank_phone, commission_rate`,
+      params
+    );
+    res.json({ ok: true, profile: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// Admin: GET /api/tdp/partners — list all partners
+app.get("/api/tdp/partners", requireTDPAuth, async (req, res) => {
+  if (!['superadmin', 'admin'].includes(req.tdpUser.role)) return res.status(403).json({ ok: false, error: "forbidden" });
+  try {
+    const { rows } = await tdpPool.query(
+      `SELECT u.id, u.email, u.full_name, u.role, u.referral_code, u.commission_rate, u.created_at,
+        (SELECT COUNT(*) FROM tdpadmin.clients WHERE created_by = u.id) AS total_leads,
+        (SELECT COALESCE(SUM(commission_amount),0) FROM tdpadmin.commissions WHERE partner_id = u.id AND status IN ('approved','paid')) AS total_earned
+       FROM tdpadmin.users u WHERE u.role = 'sales' ORDER BY u.full_name ASC`
+    );
+    res.json({ ok: true, partners: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// Admin: GET /api/tdp/partners/commissions — all commissions
+app.get("/api/tdp/partners/commissions", requireTDPAuth, async (req, res) => {
+  if (!['superadmin', 'admin'].includes(req.tdpUser.role)) return res.status(403).json({ ok: false, error: "forbidden" });
+  try {
+    const { rows } = await tdpPool.query(
+      `SELECT c.*, u.full_name AS partner_name FROM tdpadmin.commissions c
+       LEFT JOIN tdpadmin.users u ON u.id = c.partner_id ORDER BY c.created_at DESC`
+    );
+    res.json({ ok: true, commissions: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// Admin: POST /api/tdp/partners/commissions — create commission
+app.post("/api/tdp/partners/commissions", requireTDPAuth, async (req, res) => {
+  if (!['superadmin', 'admin'].includes(req.tdpUser.role)) return res.status(403).json({ ok: false, error: "forbidden" });
+  try {
+    const { partner_id, client_id, project_name, client_name, project_value, commission_rate } = req.body || {};
+    if (!partner_id || !project_value) return res.status(400).json({ ok: false, error: "partner_id and project_value required" });
+    const rate = Number(commission_rate || 10);
+    const amount = Number(project_value) * rate / 100;
+    const { rows } = await tdpPool.query(
+      `INSERT INTO tdpadmin.commissions (partner_id, client_id, project_name, client_name, project_value, commission_rate, commission_amount)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [partner_id, client_id || null, project_name || '', client_name || '', Number(project_value), rate, amount]
+    );
+    res.json({ ok: true, commission: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// Admin: PATCH /api/tdp/partners/commissions/:id — update commission status
+app.patch("/api/tdp/partners/commissions/:id", requireTDPAuth, async (req, res) => {
+  if (!['superadmin', 'admin'].includes(req.tdpUser.role)) return res.status(403).json({ ok: false, error: "forbidden" });
+  try {
+    const { status } = req.body || {};
+    if (!status) return res.status(400).json({ ok: false, error: "status required" });
+    const extra = status === 'paid' ? ", paid_at = NOW()" : "";
+    const { rows } = await tdpPool.query(
+      `UPDATE tdpadmin.commissions SET status = $1${extra} WHERE id = $2 RETURNING *`,
+      [status, req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, commission: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// =============================================================================
 // Start server
 // =============================================================================
 
