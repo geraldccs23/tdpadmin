@@ -9,6 +9,12 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        proxy: {
+          '/api': {
+            target: 'https://api.admin.tallerdepixeles.com',
+            changeOrigin: true,
+          }
+        }
       },
       plugins: [react(), tailwindcss()],
       define: {

@@ -1113,7 +1113,7 @@ app.get("/api/tdp/projects", requireTDPAuth, async (req, res) => {
     let sql = `SELECT p.*,
       (SELECT COUNT(*) FROM tdpadmin.project_tasks WHERE project_id = p.id AND status = 'done') AS tasks_done,
       (SELECT COUNT(*) FROM tdpadmin.project_tasks WHERE project_id = p.id) AS tasks_total,
-      (SELECT json_agg(json_build_object('id', pm.user_id, 'name', u.name, 'email', u.email, 'role', pm.role))
+      (SELECT json_agg(json_build_object('id', pm.user_id, 'name', u.full_name, 'email', u.email, 'role', pm.role))
        FROM tdpadmin.project_members pm
        LEFT JOIN tdpadmin.users u ON u.id = pm.user_id
        WHERE pm.project_id = p.id) AS members
@@ -1147,7 +1147,7 @@ app.get("/api/tdp/projects/:id", requireTDPAuth, async (req, res) => {
   try {
     const { rows } = await tdpPool.query(
       `SELECT p.*, c.name AS client_name, c.email AS client_email, c.phone AS client_phone,
-        (SELECT json_agg(json_build_object('id', pm.user_id, 'name', u.name, 'email', u.email, 'role', pm.role) ORDER BY pm.created_at)
+        (SELECT json_agg(json_build_object('id', pm.user_id, 'name', u.full_name, 'email', u.email, 'role', pm.role) ORDER BY pm.created_at)
          FROM tdpadmin.project_members pm
          LEFT JOIN tdpadmin.users u ON u.id = pm.user_id
          WHERE pm.project_id = p.id) AS members
@@ -1164,14 +1164,14 @@ app.get("/api/tdp/projects/:id", requireTDPAuth, async (req, res) => {
       [req.params.id],
     );
     const { rows: tasks } = await tdpPool.query(
-      `SELECT t.*, u.name AS assignee_name
+      `SELECT t.*, u.full_name AS assignee_name
        FROM tdpadmin.project_tasks t
        LEFT JOIN tdpadmin.users u ON u.id = t.assignee_id
        WHERE t.project_id = $1 ORDER BY t.sort_order ASC, t.created_at DESC`,
       [req.params.id],
     );
     const { rows: activity } = await tdpPool.query(
-      `SELECT a.*, u.name AS user_name
+      `SELECT a.*, u.full_name AS user_name
        FROM tdpadmin.project_activity a
        LEFT JOIN tdpadmin.users u ON u.id = a.user_id
        WHERE a.project_id = $1 ORDER BY a.created_at DESC LIMIT 50`,
@@ -1273,7 +1273,7 @@ app.post("/api/tdp/projects/:id/members", requireTDPAuth, async (req, res) => {
        ON CONFLICT (project_id, user_id) DO UPDATE SET role = $3 RETURNING *`,
       [req.params.id, user_id, role || "developer"],
     );
-    const { rows: users } = await tdpPool.query("SELECT name FROM tdpadmin.users WHERE id = $1", [user_id]);
+    const { rows: users } = await tdpPool.query("SELECT full_name AS name FROM tdpadmin.users WHERE id = $1", [user_id]);
     const userName = users[0]?.name || "Usuario";
     logProjectActivity(req.params.id, req.tdpUser.id, "member_added", `${userName} añadido como ${role || "developer"}`);
     res.json({ ok: true, member: rows[0] });
@@ -1285,7 +1285,7 @@ app.post("/api/tdp/projects/:id/members", requireTDPAuth, async (req, res) => {
 // DELETE /api/tdp/projects/:id/members/:userId
 app.delete("/api/tdp/projects/:id/members/:userId", requireTDPAuth, async (req, res) => {
   try {
-    const { rows: users } = await tdpPool.query("SELECT name FROM tdpadmin.users WHERE id = $1", [req.params.userId]);
+    const { rows: users } = await tdpPool.query("SELECT full_name AS name FROM tdpadmin.users WHERE id = $1", [req.params.userId]);
     const userName = users[0]?.name || "Usuario";
     await tdpPool.query(
       "DELETE FROM tdpadmin.project_members WHERE project_id = $1 AND user_id = $2",
@@ -1493,7 +1493,7 @@ app.delete("/api/tdp/projects/:id/expenses/:expId", requireTDPAuth, async (req, 
 app.get("/api/tdp/users/team", requireTDPAuth, async (req, res) => {
   try {
     const { rows } = await tdpPool.query(
-      "SELECT id, name, email, role FROM tdpadmin.users WHERE role IN ('superadmin','admin','director','project_manager','developer','designer','content') ORDER BY name",
+      "SELECT id, full_name AS name, email, role FROM tdpadmin.users WHERE role IN ('superadmin','admin','director','project_manager','developer','designer','content') ORDER BY full_name",
     );
     res.json({ ok: true, users: rows });
   } catch (e) {
