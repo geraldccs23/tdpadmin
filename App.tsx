@@ -91,6 +91,7 @@ import { Users as UsersPage } from "./pages/Users";
 import { InventoryProducts } from "./pages/InventoryProducts";
 import { TDPConnectModule } from "./pages/TDPConnectModule";
 import { PartnerDashboard } from "./pages/PartnerDashboard";
+import { PartnersAdmin } from "./pages/PartnersAdmin";
 import { CrmModule } from "./pages/CrmModule";
 import { ProyectosModule } from "./pages/ProyectosModule";
 import { CotizacionesModule } from "./pages/CotizacionesModule";
@@ -148,7 +149,10 @@ type View =
   | "crm"
   | "proyectos"
   | "cotizaciones"
-  | "support_tdp";
+  | "support_tdp"
+  | "tdp_connect"
+  | "partner_dashboard"
+  | "partners_admin";
 export type Role =
   | "director"
   | "supervisor"
@@ -172,9 +176,7 @@ export type Role =
   | "client"
   | "project_manager"
   | "developer"
-  | "restaurant"
-  | "tdp_connect"
-  | "partner_dashboard";
+  | "restaurant";
 
 const rolePermissions: Record<Role, View[]> = {
   director: [
@@ -337,6 +339,8 @@ const rolePermissions: Record<Role, View[]> = {
     "cotizaciones",
     "support_tdp",
     "dashboard",
+    "partner_dashboard",
+    "partners_admin",
     "inventory",
     "erp_inventory",
     "suppliers",
@@ -397,6 +401,7 @@ const rolePermissions: Record<Role, View[]> = {
     "users",
     "tdp_connect",
     "partner_dashboard",
+    "partners_admin",
   ],
   support: [
     "dashboard",
@@ -846,6 +851,16 @@ export default function App() {
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
             allowedRoles={["superadmin", "admin", "sales"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={Award}
+            label="Gestión Partners"
+            view="partners_admin"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["superadmin", "admin"]}
             userRole={userRole}
           />
 
@@ -1714,9 +1729,11 @@ export default function App() {
                                                                        ? "Soporte"
                                                                        : activeView === "tdp_connect"
                                                                        ? "TDP Connect"
-                                                                       : activeView === "partner_dashboard"
-                                                                       ? "Partner"
-                                                                       : activeView}
+                                                                        : activeView === "partner_dashboard"
+                                                                        ? "Partner"
+                                                                        : activeView === "partners_admin"
+                                                                        ? "Gestión Partners"
+                                                                        : activeView}
               </h1>
               <div className="h-4 w-px bg-gray-200 hidden sm:block"></div>
               <span className="text-[10px] md:text-xs text-gray-400 font-medium hidden sm:block">
@@ -1822,6 +1839,7 @@ export default function App() {
               {activeView === "support_tdp" && <SupportModule userRole={userRole || ''} />}
               {activeView === "tdp_connect" && <TDPConnectModule />}
               {activeView === "partner_dashboard" && <PartnerDashboard />}
+              {activeView === "partners_admin" && <PartnersAdmin />}
             </>
           )}
         </div>

@@ -5343,6 +5343,24 @@ app.post("/api/tdp/partners/commissions", requireTDPAuth, async (req, res) => {
   }
 });
 
+// Admin: PATCH /api/tdp/partners/:id — update partner (commission_rate)
+app.patch("/api/tdp/partners/:id", requireTDPAuth, async (req, res) => {
+  if (!['superadmin', 'admin'].includes(req.tdpUser.role)) return res.status(403).json({ ok: false, error: "forbidden" });
+  try {
+    const { commission_rate } = req.body || {};
+    if (commission_rate === undefined) return res.status(400).json({ ok: false, error: "commission_rate required" });
+    const rate = Math.min(Math.max(Number(commission_rate), 0), 100);
+    const { rows } = await tdpPool.query(
+      "UPDATE tdpadmin.users SET commission_rate = $1 WHERE id = $2 AND role = 'sales' RETURNING id, email, full_name, role, commission_rate",
+      [rate, req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "partner not found" });
+    res.json({ ok: true, partner: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
 // Admin: PATCH /api/tdp/partners/commissions/:id — update commission status
 app.patch("/api/tdp/partners/commissions/:id", requireTDPAuth, async (req, res) => {
   if (!['superadmin', 'admin'].includes(req.tdpUser.role)) return res.status(403).json({ ok: false, error: "forbidden" });
