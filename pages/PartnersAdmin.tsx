@@ -34,6 +34,10 @@ export function PartnersAdmin() {
   const [showCreate, setShowCreate] = useState(false);
   const [newComm, setNewComm] = useState({ partner_id: '', project_name: '', client_name: '', project_value: '', commission_rate: '' });
 
+  // Create partner modal
+  const [showCreatePartner, setShowCreatePartner] = useState(false);
+  const [newPartner, setNewPartner] = useState({ email: '', full_name: '', password: '' });
+
   // Edit rate modal
   const [editPartner, setEditPartner] = useState<any>(null);
   const [editRate, setEditRate] = useState('');
@@ -67,6 +71,18 @@ export function PartnersAdmin() {
       setNewComm({ partner_id: '', project_name: '', client_name: '', project_value: '', commission_rate: '' });
       fetchData();
     } else alert(res.error || 'Error al crear');
+  };
+
+  const handleCreatePartner = async () => {
+    if (!newPartner.email || !newPartner.password) return;
+    const res = await api('/api/tdp/users', {
+      method: 'POST', body: JSON.stringify({ ...newPartner, role: 'sales' }),
+    });
+    if (res.ok) {
+      setShowCreatePartner(false);
+      setNewPartner({ email: '', full_name: '', password: '' });
+      fetchData();
+    } else alert(res.error || 'Error al crear partner');
   };
 
   const handleUpdateStatus = async (id: string, status: string) => {
@@ -112,6 +128,9 @@ export function PartnersAdmin() {
           Partners
         </h1>
         <div className="flex items-center gap-3">
+          <button onClick={() => setShowCreatePartner(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-2xl hover:bg-emerald-700 transition-colors text-sm font-bold">
+            <Plus size={16} /> Partner
+          </button>
           <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-colors text-sm font-bold">
             <Plus size={16} /> Comisión
           </button>
@@ -294,6 +313,35 @@ export function PartnersAdmin() {
               )}
               <button onClick={handleCreate} className="w-full py-3 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-colors text-sm">
                 Crear Comisión
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create partner modal */}
+      {showCreatePartner && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowCreatePartner(false)}>
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-black text-gray-800">Nuevo Partner</h2>
+              <button onClick={() => setShowCreatePartner(false)} className="p-1.5 hover:bg-gray-100 rounded-xl"><X size={18} /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Nombre</label>
+                <input value={newPartner.full_name} onChange={e => setNewPartner({ ...newPartner, full_name: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Email</label>
+                <input type="email" value={newPartner.email} onChange={e => setNewPartner({ ...newPartner, email: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Contraseña</label>
+                <input type="password" value={newPartner.password} onChange={e => setNewPartner({ ...newPartner, password: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200" />
+              </div>
+              <button onClick={handleCreatePartner} className="w-full py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-colors text-sm">
+                Crear Partner
               </button>
             </div>
           </div>

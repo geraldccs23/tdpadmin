@@ -4804,7 +4804,14 @@ app.post(
        RETURNING id, email, full_name, role, status, created_at`,
         [email.trim().toLowerCase(), hash, full_name || email, userRole],
       );
-      res.json({ ok: true, user: rows[0] });
+      const newUser = rows[0];
+      // Auto-generar referral_code para partners (role = sales)
+      if (userRole === 'sales') {
+        const refCode = 'TDP-' + Array.from({ length: 6 }, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 36)]).join('');
+        await tdpPool.query("UPDATE tdpadmin.users SET referral_code = $1 WHERE id = $2", [refCode, newUser.id]);
+        newUser.referral_code = refCode;
+      }
+      res.json({ ok: true, user: newUser });
     } catch (e) {
       const msg =
         e?.constraint === "tdpadmin_users_email_key"
