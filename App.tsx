@@ -96,6 +96,7 @@ import { CrmModule } from "./pages/CrmModule";
 import { ProyectosModule } from "./pages/ProyectosModule";
 import { CotizacionesModule } from "./pages/CotizacionesModule";
 import { SupportModule } from "./pages/SupportModule";
+import { InvoicesModule } from "./pages/InvoicesModule";
 
 type View =
   | "dashboard"
@@ -152,7 +153,8 @@ type View =
   | "support_tdp"
   | "tdp_connect"
   | "partner_dashboard"
-  | "partners_admin";
+  | "partners_admin"
+  | "invoices";
 export type Role =
   | "director"
   | "supervisor"
@@ -185,6 +187,7 @@ const rolePermissions: Record<Role, View[]> = {
     "proyectos",
     "cotizaciones",
     "support_tdp",
+    "invoices",
     "settings",
     "users",
   ],
@@ -402,6 +405,7 @@ const rolePermissions: Record<Role, View[]> = {
     "tdp_connect",
     "partner_dashboard",
     "partners_admin",
+    "invoices",
   ],
   support: [
     "dashboard",
@@ -413,6 +417,7 @@ const rolePermissions: Record<Role, View[]> = {
     "crm",
     "proyectos",
     "cotizaciones",
+    "invoices",
     "partner_dashboard",
   ],
   staff: [
@@ -422,6 +427,7 @@ const rolePermissions: Record<Role, View[]> = {
   finance: [
     "dashboard",
     "support_tdp",
+    "invoices",
   ],
   project_manager: [
     "dashboard",
@@ -429,6 +435,7 @@ const rolePermissions: Record<Role, View[]> = {
     "crm",
     "proyectos",
     "cotizaciones",
+    "invoices",
   ],
   developer: [
     "dashboard",
@@ -775,6 +782,16 @@ export default function App() {
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
             allowedRoles={["superadmin", "admin", "sales"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={FileText}
+            label="Facturación"
+            view="invoices"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["superadmin", "admin", "director", "sales", "finance", "project_manager"]}
             userRole={userRole}
           />
           <NavItem
@@ -1836,6 +1853,7 @@ export default function App() {
               {activeView === "crm" && <CrmModule />}
               {activeView === "proyectos" && <ProyectosModule />}
               {activeView === "cotizaciones" && <CotizacionesModule />}
+              {activeView === "invoices" && <InvoicesModule userRole={userRole || ''} />}
               {activeView === "support_tdp" && <SupportModule userRole={userRole || ''} />}
               {activeView === "tdp_connect" && <TDPConnectModule />}
               {activeView === "partner_dashboard" && <PartnerDashboard />}

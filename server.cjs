@@ -1105,6 +1105,187 @@ app.post("/api/tdp/quotes/:id/reject", requireTDPAuth, async (req, res) => {
 });
 
 // =============================================================================
+// Facturación / Invoices
+// =============================================================================
+
+// GET /api/tdp/invoices
+app.get("/api/tdp/invoices", requireTDPAuth, async (req, res) => {
+  try {
+    let sql = `SELECT i.*, c.name AS client_name, c.email AS client_email,
+      COALESCE(u.full_name, '') AS created_by_name
+      FROM tdpadmin.invoices i
+      LEFT JOIN tdpadmin.clients c ON c.id = i.client_id
+      LEFT JOIN tdpadmin.users u ON u.id = i.created_by
+      WHERE 1=1`;
+    const params = [];
+    if (req.query.status) {
+      params.push(req.query.status);
+      sql += ` AND i.status = $${params.length}`;
+    }
+    if (req.query.client_id) {
+      params.push(req.query.client_id);
+      sql += ` AND i.client_id = $${params.length}`;
+    }
+    sql += " ORDER BY i.created_at DESC LIMIT 100";
+    const { rows } = await tdpPool.query(sql, params);
+    res.json({ ok: true, invoices: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/tdp/invoices/:id
+app.get("/api/tdp/invoices/:id", requireTDPAuth, async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      `SELECT i.*, c.name AS client_name, c.email AS client_email, c.phone AS client_phone,
+        c.address AS client_address, c.document_id AS client_document,
+        COALESCE(u.full_name, '') AS created_by_name
+       FROM tdpadmin.invoices i
+       LEFT JOIN tdpadmin.clients c ON c.id = i.client_id
+       LEFT JOIN tdpadmin.users u ON u.id = i.created_by
+       WHERE i.id = $1`,
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    const items = await tdpPool.query(
+      "SELECT * FROM tdpadmin.invoice_items WHERE invoice_id = $1 ORDER BY sort_order ASC",
+      [req.params.id]
+    );
+    res.json({ ok: true, invoice: rows[0], items: items.rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/invoices — create from scratch
+app.post("/api/tdp/invoices", requireTDPAuth, async (req, res) => {
+  try {
+    const { client_id, project_id, quote_id, title, issue_date, due_date, notes, terms, items } = req.body || {};
+    if (!client_id) return res.status(400).json({ ok: false, error: "client_id required" });
+    let subtotal = 0;
+    for (const it of items || []) {
+      subtotal += (Number(it.quantity) || 1) * (Number(it.unit_price) || 0);
+    }
+    const discount = Number(req.body.discount) || 0;
+    const taxRate = Number(req.body.tax_rate) || 0;
+    const tax = (subtotal - discount) * taxRate / 100;
+    const total = subtotal - discount + tax;
+
+    const { rows } = await tdpPool.query(
+      `INSERT INTO tdpadmin.invoices (client_id, project_id, quote_id, title, status, subtotal, discount, tax, total, issue_date, due_date, notes, terms, created_by)
+       VALUES ($1,$2,$3,$4,'draft',$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [client_id, project_id || null, quote_id || null, title || '', subtotal, discount, tax, total, issue_date || null, due_date || null, notes || '', terms || '', req.tdpUser.id]
+    );
+    const inv = rows[0];
+
+    if (items && items.length > 0) {
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        const lineTotal = (Number(it.quantity) || 1) * (Number(it.unit_price) || 0);
+        await tdpPool.query(
+          `INSERT INTO tdpadmin.invoice_items (invoice_id, description, quantity, unit_price, total, sort_order)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [inv.id, it.description || '', Number(it.quantity) || 1, Number(it.unit_price) || 0, lineTotal, i]
+        );
+      }
+    }
+
+    res.json({ ok: true, invoice: inv });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/invoices/from-quote/:id — generate invoice from quote
+app.post("/api/tdp/invoices/from-quote/:id", requireTDPAuth, async (req, res) => {
+  try {
+    const quoteRes = await tdpPool.query(
+      `SELECT q.*, qi.id AS item_id, qi.description, qi.quantity, qi.unit_price, qi.total_price, qi.display_order
+       FROM tdpadmin.quotes q
+       LEFT JOIN tdpadmin.quote_items qi ON qi.quote_id = q.id
+       WHERE q.id = $1`,
+      [req.params.id]
+    );
+    if (quoteRes.rows.length === 0) return res.status(404).json({ ok: false, error: "quote not found" });
+    const quote = { ...quoteRes.rows[0] };
+    const items = quoteRes.rows.filter(r => r.item_id).map(r => ({
+      description: r.description,
+      quantity: r.quantity || 1,
+      unit_price: r.unit_price || 0,
+    }));
+
+    let subtotal = 0;
+    for (const it of items) subtotal += (Number(it.quantity) || 1) * (Number(it.unit_price) || 0);
+    const tax = Number(quote.tax) || 0;
+    const total = Number(quote.total) || subtotal;
+
+    const { rows } = await tdpPool.query(
+      `INSERT INTO tdpadmin.invoices (client_id, project_id, quote_id, title, status, subtotal, tax, total, currency, exchange_rate, issue_date, notes, terms, created_by)
+       VALUES ($1,$2,$3,$4,'draft',$5,$6,$7,$8,$9,NOW(),$10,$11,$12) RETURNING *`,
+      [quote.client_id, quote.project_id || null, quote.id, quote.title || '', subtotal, tax, total, quote.currency || 'USD', quote.exchange_rate || null, quote.notes || '', quote.terms || '', req.tdpUser.id]
+    );
+    const inv = rows[0];
+
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const lineTotal = (Number(it.quantity) || 1) * (Number(it.unit_price) || 0);
+      await tdpPool.query(
+        `INSERT INTO tdpadmin.invoice_items (invoice_id, description, quantity, unit_price, total, sort_order)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [inv.id, it.description || '', Number(it.quantity) || 1, Number(it.unit_price) || 0, lineTotal, i]
+      );
+    }
+
+    // Update quote status to 'invoiced' if exists
+    await tdpPool.query("UPDATE tdpadmin.quotes SET status = 'invoiced' WHERE id = $1 AND status = 'approved'", [req.params.id]);
+
+    res.json({ ok: true, invoice: inv });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/tdp/invoices/:id — update invoice
+app.patch("/api/tdp/invoices/:id", requireTDPAuth, async (req, res) => {
+  try {
+    const allowed = ['status', 'issue_date', 'due_date', 'notes', 'terms'];
+    const sets = [];
+    const params = [];
+    let idx = 0;
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        idx++; sets.push(`${key} = $${idx}`); params.push(req.body[key]);
+      }
+    }
+    if (req.body.status === 'paid') {
+      idx++; sets.push(`paid_at = $${idx}`); params.push(new Date().toISOString());
+    }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields to update" });
+    idx++; params.push(req.params.id);
+    const { rows } = await tdpPool.query(
+      `UPDATE tdpadmin.invoices SET ${sets.join(", ")} WHERE id = $${idx} RETURNING *`,
+      params
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "not found" });
+    res.json({ ok: true, invoice: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// DELETE /api/tdp/invoices/:id — only if draft
+app.delete("/api/tdp/invoices/:id", requireTDPAuth, async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query("DELETE FROM tdpadmin.invoices WHERE id = $1 AND status = 'draft' RETURNING id", [req.params.id]);
+    if (rows.length === 0) return res.status(400).json({ ok: false, error: "only draft invoices can be deleted" });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// =============================================================================
 // Proyectos
 // =============================================================================
 
