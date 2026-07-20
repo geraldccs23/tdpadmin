@@ -41,6 +41,7 @@ import { tdpAuth } from "./services/tdpAuth";
 import { supabase } from "./services/supabase";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
+import { TdpDashboard } from "./pages/TdpDashboard";
 import { Inventory } from "./pages/Inventory";
 import { Suppliers } from "./pages/Suppliers";
 import { SalesNE } from "./pages/SalesNE";
@@ -1747,7 +1748,7 @@ export default function App() {
             </div>
           ) : (
             <>
-              {activeView === "dashboard" && <Dashboard userRole={userRole} />}
+              {activeView === "dashboard" && <TdpDashboard />}
               {activeView === "inventory" && <Inventory />}
               {activeView === "suppliers" && <Suppliers />}
               {activeView === "sales" && <SalesNE />}

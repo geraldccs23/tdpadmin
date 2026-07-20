@@ -5362,6 +5362,38 @@ app.patch("/api/tdp/partners/commissions/:id", requireTDPAuth, async (req, res) 
 });
 
 // =============================================================================
+// TDP Dashboard — summary of all modules
+// =============================================================================
+
+app.get("/api/tdp/dashboard/summary", requireTDPAuth, async (req, res) => {
+  try {
+    const [support, projects, crm, quotes, connect, commissions, recent] = await Promise.all([
+      tdpPool.query("SELECT * FROM tdpadmin.vw_support_stats"),
+      tdpPool.query("SELECT * FROM tdpadmin.vw_project_stats"),
+      tdpPool.query("SELECT * FROM tdpadmin.vw_crm_stats"),
+      tdpPool.query("SELECT * FROM tdpadmin.vw_quote_stats"),
+      tdpPool.query("SELECT * FROM tdpadmin.vw_connect_stats"),
+      tdpPool.query("SELECT * FROM tdpadmin.vw_commission_stats"),
+      tdpPool.query("SELECT * FROM tdpadmin.vw_recent_activity"),
+    ]);
+    res.json({
+      ok: true,
+      dashboard: {
+        support: support.rows[0] || {},
+        projects: projects.rows[0] || {},
+        crm: crm.rows[0] || {},
+        quotes: quotes.rows[0] || {},
+        connect: connect.rows[0] || {},
+        commissions: commissions.rows[0] || {},
+        recent_activity: recent.rows || [],
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// =============================================================================
 // Public endpoints (token-based auth for external systems like RG7)
 // =============================================================================
 
