@@ -1122,14 +1122,25 @@ app.get("/api/tdp/projects", requireTDPAuth, async (req, res) => {
       WHERE 1=1`;
     const params = [];
     for (const key of ["status", "priority", "project_type"]) {
-      if (req.query[key]) {
-        params.push(req.query[key]);
-        sql += ` AND p.${key} = $${params.length}`;
+      const val = req.query[key];
+      if (val) {
+        if (Array.isArray(val)) {
+          const placeholders = val.map((_, i) => `$${params.length + i + 1}`);
+          params.push(...val);
+          sql += ` AND p.${key} IN (${placeholders.join(',')})`;
+        } else {
+          params.push(val);
+          sql += ` AND p.${key} = $${params.length}`;
+        }
       }
     }
     if (req.query.search) {
       params.push(`%${req.query.search}%`);
       sql += ` AND (p.name ILIKE $${params.length} OR p.client_name ILIKE $${params.length} OR p.description ILIKE $${params.length})`;
+    }
+    if (req.query.partner_id) {
+      params.push(req.query.partner_id);
+      sql += ` AND p.client_id IN (SELECT id FROM tdpadmin.clients WHERE created_by = $${params.length} OR assigned_to = $${params.length})`;
     }
     if (req.tdpUser.role === "client") {
       params.push(req.tdpUser.client_id);

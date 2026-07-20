@@ -32,7 +32,9 @@ export function PartnersAdmin() {
 
   // Create commission modal
   const [showCreate, setShowCreate] = useState(false);
-  const [newComm, setNewComm] = useState({ partner_id: '', project_name: '', client_name: '', project_value: '', commission_rate: '' });
+  const [newComm, setNewComm] = useState({ partner_id: '', project_id: '', project_name: '', client_name: '', project_value: '', commission_rate: '' });
+  const [partnerProjects, setPartnerProjects] = useState<any[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
 
   // Create partner modal
   const [showCreatePartner, setShowCreatePartner] = useState(false);
@@ -60,6 +62,7 @@ export function PartnersAdmin() {
     const res = await api('/api/tdp/partners/commissions', {
       method: 'POST', body: JSON.stringify({
         partner_id: newComm.partner_id,
+        client_id: newComm.project_id ? '' : undefined,
         project_name: newComm.project_name,
         client_name: newComm.client_name,
         project_value: Number(newComm.project_value),
@@ -68,9 +71,38 @@ export function PartnersAdmin() {
     });
     if (res.ok) {
       setShowCreate(false);
-      setNewComm({ partner_id: '', project_name: '', client_name: '', project_value: '', commission_rate: '' });
+      setNewComm({ partner_id: '', project_id: '', project_name: '', client_name: '', project_value: '', commission_rate: '' });
+      setPartnerProjects([]);
       fetchData();
     } else alert(res.error || 'Error al crear');
+  };
+
+  const handlePartnerSelect = async (partnerId: string) => {
+    setNewComm({ partner_id: partnerId, project_id: '', project_name: '', client_name: '', project_value: '', commission_rate: '' });
+    if (!partnerId) { setPartnerProjects([]); return; }
+    setLoadingProjects(true);
+    const res = await api(`/api/tdp/projects?partner_id=${partnerId}&status=active&status=completed`);
+    if (res.ok) setPartnerProjects(res.projects || []);
+    setLoadingProjects(false);
+  };
+
+  const handleProjectSelect = (projectId: string) => {
+    if (!projectId) {
+      setNewComm(n => ({ ...n, project_id: '', project_name: '', client_name: '', project_value: '', commission_rate: n.commission_rate }));
+      return;
+    }
+    const p = partnerProjects.find((p: any) => p.id === projectId);
+    if (p) {
+      const partner = partners.find((pr: any) => pr.id === newComm.partner_id);
+      setNewComm({
+        partner_id: newComm.partner_id,
+        project_id: projectId,
+        project_name: p.name || '',
+        client_name: p.client_name || '',
+        project_value: String(p.budget || 0),
+        commission_rate: String(partner?.commission_rate || 10),
+      });
+    }
   };
 
   const handleCreatePartner = async () => {
@@ -275,14 +307,20 @@ export function PartnersAdmin() {
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Partner</label>
-                <select value={newComm.partner_id} onChange={e => {
-                  const p = partners.find((p: any) => p.id === e.target.value);
-                  setNewComm({ ...newComm, partner_id: e.target.value, commission_rate: p ? String(p.commission_rate || 10) : '10' });
-                }} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200">
+                <select value={newComm.partner_id} onChange={e => handlePartnerSelect(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200">
                   <option value="">Seleccionar...</option>
                   {partners.map((p: any) => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
                 </select>
               </div>
+              {newComm.partner_id && (
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Proyecto del Partner</label>
+                  <select value={newComm.project_id} onChange={e => handleProjectSelect(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200">
+                    <option value="">{loadingProjects ? 'Cargando...' : '— Sin proyecto (manual) —'}</option>
+                    {partnerProjects.map((p: any) => <option key={p.id} value={p.id}>{p.name} ({p.client_name}) — ${Number(p.budget || 0).toLocaleString()}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Proyecto</label>
