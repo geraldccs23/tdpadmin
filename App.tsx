@@ -40,7 +40,6 @@ import { auth } from "./services/auth";
 import { tdpAuth } from "./services/tdpAuth";
 import { supabase } from "./services/supabase";
 import { Login } from "./pages/Login";
-import { Dashboard } from "./pages/Dashboard";
 import { TdpDashboard } from "./pages/TdpDashboard";
 import { Inventory } from "./pages/Inventory";
 import { Suppliers } from "./pages/Suppliers";
@@ -443,7 +442,7 @@ const rolePermissions: Record<Role, View[]> = {
 };
 
 const defaultViews: Record<Role, View> = {
-  director: "dashboard_restaurant",
+  director: "dashboard",
   supervisor: "dashboard",
   supervisor_ventas: "income",
   supervisor_compras: "purchase_orders",
@@ -455,10 +454,10 @@ const defaultViews: Record<Role, View> = {
   delivery: "delivery_panel",
   supervisor_almacen: "warehouse",
   almacenista: "warehouse",
-  admin: "dashboard_restaurant",
+  admin: "dashboard",
   cocina: "kitchen_panel",
   client: "support_tdp",
-  superadmin: "dashboard_restaurant",
+  superadmin: "dashboard",
   support: "support_tdp",
   sales: "support_tdp",
   staff: "support_tdp",
@@ -728,11 +727,11 @@ export default function App() {
           <NavItem
             icon={LayoutDashboard}
             label="Dashboard"
-            view="dashboard_restaurant"
+            view="dashboard"
             activeView={activeView}
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
-            allowedRoles={["superadmin", "admin", "supervisor", "cocina", "cajero", "compras", "restaurant"]}
+            allowedRoles={["superadmin", "admin", "director", "supervisor", "project_manager", "developer", "sales", "support", "finance"]}
             userRole={userRole}
             perm="dashboard.view"
             userPermissions={permissions}
