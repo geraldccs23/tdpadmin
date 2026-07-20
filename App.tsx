@@ -178,7 +178,7 @@ export type Role =
 
 const rolePermissions: Record<Role, View[]> = {
   director: [
-    "dashboard_restaurant",
+    "dashboard",
     "crm",
     "proyectos",
     "cotizaciones",
@@ -388,8 +388,8 @@ const rolePermissions: Record<Role, View[]> = {
     "support_tdp",
   ],
   superadmin: [
+    "dashboard",
     "support_tdp",
-    "dashboard_restaurant",
     "crm",
     "proyectos",
     "cotizaciones",
@@ -399,9 +399,11 @@ const rolePermissions: Record<Role, View[]> = {
     "partner_dashboard",
   ],
   support: [
+    "dashboard",
     "support_tdp",
   ],
   sales: [
+    "dashboard",
     "support_tdp",
     "crm",
     "proyectos",
@@ -409,18 +411,22 @@ const rolePermissions: Record<Role, View[]> = {
     "partner_dashboard",
   ],
   staff: [
+    "dashboard",
     "support_tdp",
   ],
   finance: [
+    "dashboard",
     "support_tdp",
   ],
   project_manager: [
+    "dashboard",
     "support_tdp",
     "crm",
     "proyectos",
     "cotizaciones",
   ],
   developer: [
+    "dashboard",
     "support_tdp",
     "proyectos",
   ],
