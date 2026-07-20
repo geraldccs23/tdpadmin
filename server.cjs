@@ -1103,6 +1103,404 @@ app.post("/api/tdp/quotes/:id/reject", requireTDPAuth, async (req, res) => {
   }
 });
 
+// =============================================================================
+// Proyectos
+// =============================================================================
+
+// GET /api/tdp/projects
+app.get("/api/tdp/projects", requireTDPAuth, async (req, res) => {
+  try {
+    let sql = `SELECT p.*,
+      (SELECT COUNT(*) FROM tdpadmin.project_tasks WHERE project_id = p.id AND status = 'done') AS tasks_done,
+      (SELECT COUNT(*) FROM tdpadmin.project_tasks WHERE project_id = p.id) AS tasks_total,
+      (SELECT json_agg(json_build_object('id', pm.user_id, 'name', u.name, 'email', u.email, 'role', pm.role))
+       FROM tdpadmin.project_members pm
+       LEFT JOIN tdpadmin.users u ON u.id = pm.user_id
+       WHERE pm.project_id = p.id) AS members
+      FROM tdpadmin.projects p
+      WHERE 1=1`;
+    const params = [];
+    for (const key of ["status", "priority", "project_type"]) {
+      if (req.query[key]) {
+        params.push(req.query[key]);
+        sql += ` AND p.${key} = $${params.length}`;
+      }
+    }
+    if (req.query.search) {
+      params.push(`%${req.query.search}%`);
+      sql += ` AND (p.name ILIKE $${params.length} OR p.client_name ILIKE $${params.length} OR p.description ILIKE $${params.length})`;
+    }
+    if (req.tdpUser.role === "client") {
+      params.push(req.tdpUser.client_id);
+      sql += ` AND p.client_id = $${params.length}`;
+    }
+    sql += " ORDER BY p.created_at DESC LIMIT 100";
+    const { rows } = await tdpPool.query(sql, params);
+    res.json({ ok: true, projects: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/tdp/projects/:id
+app.get("/api/tdp/projects/:id", requireTDPAuth, async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      `SELECT p.*, c.name AS client_name, c.email AS client_email, c.phone AS client_phone,
+        (SELECT json_agg(json_build_object('id', pm.user_id, 'name', u.name, 'email', u.email, 'role', pm.role) ORDER BY pm.created_at)
+         FROM tdpadmin.project_members pm
+         LEFT JOIN tdpadmin.users u ON u.id = pm.user_id
+         WHERE pm.project_id = p.id) AS members
+       FROM tdpadmin.projects p
+       LEFT JOIN tdpadmin.clients c ON c.id = p.client_id
+       WHERE p.id = $1`,
+      [req.params.id],
+    );
+    if (rows.length === 0)
+      return res.status(404).json({ ok: false, error: "not found" });
+
+    const { rows: milestones } = await tdpPool.query(
+      "SELECT * FROM tdpadmin.project_milestones WHERE project_id = $1 ORDER BY sort_order ASC, due_date ASC NULLS LAST",
+      [req.params.id],
+    );
+    const { rows: tasks } = await tdpPool.query(
+      `SELECT t.*, u.name AS assignee_name
+       FROM tdpadmin.project_tasks t
+       LEFT JOIN tdpadmin.users u ON u.id = t.assignee_id
+       WHERE t.project_id = $1 ORDER BY t.sort_order ASC, t.created_at DESC`,
+      [req.params.id],
+    );
+    const { rows: activity } = await tdpPool.query(
+      `SELECT a.*, u.name AS user_name
+       FROM tdpadmin.project_activity a
+       LEFT JOIN tdpadmin.users u ON u.id = a.user_id
+       WHERE a.project_id = $1 ORDER BY a.created_at DESC LIMIT 50`,
+      [req.params.id],
+    );
+    const { rows: expenses } = await tdpPool.query(
+      "SELECT * FROM tdpadmin.project_expenses WHERE project_id = $1 ORDER BY created_at DESC",
+      [req.params.id],
+    );
+
+    res.json({ ok: true, project: { ...rows[0], milestones, tasks, activity, expenses: expenses || [] } });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+function logProjectActivity(projectId, userId, action, description) {
+  tdpPool.query(
+    "INSERT INTO tdpadmin.project_activity (project_id, user_id, action, description) VALUES ($1,$2,$3,$4)",
+    [projectId, userId, action, description],
+  ).catch(() => {});
+}
+
+// POST /api/tdp/projects
+app.post("/api/tdp/projects", requireTDPAuth, async (req, res) => {
+  try {
+    const {
+      client_id, name, description, project_type, priority,
+      start_date, end_date, budget, quote_id, client_name, owner_id,
+    } = req.body || {};
+    if (!name || !name.trim())
+      return res.status(400).json({ ok: false, error: "name required" });
+
+    const projectType = project_type || "otro";
+    const { rows } = await tdpPool.query(
+      `INSERT INTO tdpadmin.projects (client_id, name, description, project_type, priority, start_date, end_date, budget, quote_id, client_name, owner_id, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [
+        client_id || null, name.trim(), description || "",
+        projectType, priority || "medium",
+        start_date || null, end_date || null,
+        budget ? Number(budget) : null,
+        quote_id || null, client_name || "",
+        owner_id || req.tdpUser.id, req.tdpUser.id,
+      ],
+    );
+    logProjectActivity(rows[0].id, req.tdpUser.id, "created", `Proyecto "${name.trim()}" creado`);
+    res.json({ ok: true, project: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/tdp/projects/:id
+app.patch("/api/tdp/projects/:id", requireTDPAuth, async (req, res) => {
+  try {
+    const allowed = ["name","description","status","priority","project_type","start_date","end_date","budget","actual_cost","progress","client_id","client_name","quote_id","owner_id"];
+    const fields = {};
+    let changed = [];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        fields[key] = req.body[key];
+        changed.push(key);
+      }
+    }
+    if (Object.keys(fields).length === 0)
+      return res.status(400).json({ ok: false, error: "no fields to update" });
+
+    const sets = [];
+    const params = [];
+    let idx = 0;
+    for (const [key, val] of Object.entries(fields)) {
+      idx++;
+      sets.push(`${key} = $${idx}`);
+      params.push(val);
+    }
+    params.push(req.params.id);
+    const { rows } = await tdpPool.query(
+      `UPDATE tdpadmin.projects SET ${sets.join(", ")} WHERE id = $${idx + 1} RETURNING *`,
+      params,
+    );
+    if (rows.length === 0)
+      return res.status(404).json({ ok: false, error: "not found" });
+
+    logProjectActivity(rows[0].id, req.tdpUser.id, "updated", `Campos actualizados: ${changed.join(", ")}`);
+    res.json({ ok: true, project: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/projects/:id/members
+app.post("/api/tdp/projects/:id/members", requireTDPAuth, async (req, res) => {
+  try {
+    const { user_id, role } = req.body || {};
+    if (!user_id) return res.status(400).json({ ok: false, error: "user_id required" });
+    const { rows } = await tdpPool.query(
+      `INSERT INTO tdpadmin.project_members (project_id, user_id, role) VALUES ($1,$2,$3)
+       ON CONFLICT (project_id, user_id) DO UPDATE SET role = $3 RETURNING *`,
+      [req.params.id, user_id, role || "developer"],
+    );
+    const { rows: users } = await tdpPool.query("SELECT name FROM tdpadmin.users WHERE id = $1", [user_id]);
+    const userName = users[0]?.name || "Usuario";
+    logProjectActivity(req.params.id, req.tdpUser.id, "member_added", `${userName} añadido como ${role || "developer"}`);
+    res.json({ ok: true, member: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// DELETE /api/tdp/projects/:id/members/:userId
+app.delete("/api/tdp/projects/:id/members/:userId", requireTDPAuth, async (req, res) => {
+  try {
+    const { rows: users } = await tdpPool.query("SELECT name FROM tdpadmin.users WHERE id = $1", [req.params.userId]);
+    const userName = users[0]?.name || "Usuario";
+    await tdpPool.query(
+      "DELETE FROM tdpadmin.project_members WHERE project_id = $1 AND user_id = $2",
+      [req.params.id, req.params.userId],
+    );
+    logProjectActivity(req.params.id, req.tdpUser.id, "member_removed", `${userName} removido del equipo`);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/projects/:id/milestones
+app.post("/api/tdp/projects/:id/milestones", requireTDPAuth, async (req, res) => {
+  try {
+    const { name, description, due_date, sort_order } = req.body || {};
+    if (!name || !name.trim()) return res.status(400).json({ ok: false, error: "name required" });
+    const { rows } = await tdpPool.query(
+      `INSERT INTO tdpadmin.project_milestones (project_id, name, description, due_date, sort_order)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [req.params.id, name.trim(), description || "", due_date || null, sort_order || 0],
+    );
+    logProjectActivity(req.params.id, req.tdpUser.id, "milestone_added", `Hito "${name.trim()}" añadido`);
+    res.json({ ok: true, milestone: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/tdp/projects/:id/milestones/:msId
+app.patch("/api/tdp/projects/:id/milestones/:msId", requireTDPAuth, async (req, res) => {
+  try {
+    const allowed = ["name","description","due_date","status","sort_order"];
+    const sets = [];
+    const params = [];
+    let idx = 0;
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        idx++;
+        sets.push(`${key} = $${idx}`);
+        params.push(req.body[key]);
+      }
+    }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields" });
+    params.push(req.params.msId);
+    const { rows } = await tdpPool.query(
+      `UPDATE tdpadmin.project_milestones SET ${sets.join(", ")} WHERE id = $${idx + 1} RETURNING *`,
+      params,
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "milestone not found" });
+    logProjectActivity(req.params.id, req.tdpUser.id, "milestone_updated", `Hito "${rows[0].name}" actualizado`);
+    res.json({ ok: true, milestone: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// DELETE /api/tdp/projects/:id/milestones/:msId
+app.delete("/api/tdp/projects/:id/milestones/:msId", requireTDPAuth, async (req, res) => {
+  try {
+    await tdpPool.query("DELETE FROM tdpadmin.project_milestones WHERE id = $1", [req.params.msId]);
+    logProjectActivity(req.params.id, req.tdpUser.id, "milestone_removed", "Hito eliminado");
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/projects/:id/tasks
+app.post("/api/tdp/projects/:id/tasks", requireTDPAuth, async (req, res) => {
+  try {
+    const { title, description, priority, assignee_id, due_date, estimated_hours, milestone_id, sort_order } = req.body || {};
+    if (!title || !title.trim()) return res.status(400).json({ ok: false, error: "title required" });
+    const { rows } = await tdpPool.query(
+      `INSERT INTO tdpadmin.project_tasks (project_id, milestone_id, title, description, priority, assignee_id, due_date, estimated_hours, sort_order, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [
+        req.params.id, milestone_id || null, title.trim(), description || "",
+        priority || "medium", assignee_id || null, due_date || null,
+        estimated_hours ? Number(estimated_hours) : null,
+        sort_order || 0, req.tdpUser.id,
+      ],
+    );
+    logProjectActivity(req.params.id, req.tdpUser.id, "task_added", `Tarea "${title.trim()}" añadida`);
+    res.json({ ok: true, task: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/tdp/projects/:id/tasks/:taskId
+app.patch("/api/tdp/projects/:id/tasks/:taskId", requireTDPAuth, async (req, res) => {
+  try {
+    const allowed = ["title","description","status","priority","assignee_id","due_date","estimated_hours","actual_hours","sort_order","milestone_id"];
+    const sets = [];
+    const params = [];
+    let idx = 0;
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        idx++;
+        sets.push(`${key} = $${idx}`);
+        params.push(req.body[key]);
+      }
+    }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields" });
+
+    // If status changed to done, log it
+    if (req.body.status === "done") {
+      logProjectActivity(req.params.id, req.tdpUser.id, "task_completed", `Tarea completada: "${req.body.title || req.params.taskId}"`);
+    }
+
+    params.push(req.params.taskId);
+    const { rows } = await tdpPool.query(
+      `UPDATE tdpadmin.project_tasks SET ${sets.join(", ")} WHERE id = $${idx + 1} RETURNING *`,
+      params,
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "task not found" });
+    res.json({ ok: true, task: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// DELETE /api/tdp/projects/:id/tasks/:taskId
+app.delete("/api/tdp/projects/:id/tasks/:taskId", requireTDPAuth, async (req, res) => {
+  try {
+    await tdpPool.query("DELETE FROM tdpadmin.project_tasks WHERE id = $1", [req.params.taskId]);
+    logProjectActivity(req.params.id, req.tdpUser.id, "task_removed", "Tarea eliminada");
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// POST /api/tdp/projects/:id/expenses
+app.post("/api/tdp/projects/:id/expenses", requireTDPAuth, async (req, res) => {
+  try {
+    const { concept, amount, date } = req.body || {};
+    if (!concept || !concept.trim()) return res.status(400).json({ ok: false, error: "concept required" });
+    if (!amount) return res.status(400).json({ ok: false, error: "amount required" });
+    const { rows } = await tdpPool.query(
+      `INSERT INTO tdpadmin.project_expenses (project_id, concept, amount, date, created_by)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [req.params.id, concept.trim(), Number(amount), date || null, req.tdpUser.id],
+    );
+    // Update actual_cost
+    await tdpPool.query(
+      "UPDATE tdpadmin.projects SET actual_cost = (SELECT COALESCE(SUM(amount),0) FROM tdpadmin.project_expenses WHERE project_id = $1) WHERE id = $1",
+      [req.params.id],
+    );
+    logProjectActivity(req.params.id, req.tdpUser.id, "expense_added", `Gasto registrado: ${concept.trim()} - $${Number(amount).toFixed(2)}`);
+    res.json({ ok: true, expense: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// PATCH /api/tdp/projects/:id/expenses/:expId
+app.patch("/api/tdp/projects/:id/expenses/:expId", requireTDPAuth, async (req, res) => {
+  try {
+    const allowed = ["concept","amount","date"];
+    const sets = [];
+    const params = [];
+    let idx = 0;
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        idx++;
+        sets.push(`${key} = $${idx}`);
+        params.push(req.body[key]);
+      }
+    }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "no fields" });
+    params.push(req.params.expId);
+    const { rows } = await tdpPool.query(
+      `UPDATE tdpadmin.project_expenses SET ${sets.join(", ")} WHERE id = $${idx + 1} RETURNING *`,
+      params,
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "expense not found" });
+    await tdpPool.query(
+      "UPDATE tdpadmin.projects SET actual_cost = (SELECT COALESCE(SUM(amount),0) FROM tdpadmin.project_expenses WHERE project_id = $1) WHERE id = $1",
+      [req.params.id],
+    );
+    res.json({ ok: true, expense: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// DELETE /api/tdp/projects/:id/expenses/:expId
+app.delete("/api/tdp/projects/:id/expenses/:expId", requireTDPAuth, async (req, res) => {
+  try {
+    await tdpPool.query("DELETE FROM tdpadmin.project_expenses WHERE id = $1", [req.params.expId]);
+    await tdpPool.query(
+      "UPDATE tdpadmin.projects SET actual_cost = (SELECT COALESCE(SUM(amount),0) FROM tdpadmin.project_expenses WHERE project_id = $1) WHERE id = $1",
+      [req.params.id],
+    );
+    logProjectActivity(req.params.id, req.tdpUser.id, "expense_removed", "Gasto eliminado");
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// GET /api/tdp/users/team (for member assignment)
+app.get("/api/tdp/users/team", requireTDPAuth, async (req, res) => {
+  try {
+    const { rows } = await tdpPool.query(
+      "SELECT id, name, email, role FROM tdpadmin.users WHERE role IN ('superadmin','admin','director','project_manager','developer','designer','content') ORDER BY name",
+    );
+    res.json({ ok: true, users: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
 // --------------------
 // Admin-only middleware (JWT + role=admin)
 // --------------------

@@ -404,6 +404,7 @@ const rolePermissions: Record<Role, View[]> = {
   sales: [
     "support_tdp",
     "crm",
+    "proyectos",
     "cotizaciones",
     "partner_dashboard",
   ],
@@ -421,6 +422,7 @@ const rolePermissions: Record<Role, View[]> = {
   ],
   developer: [
     "support_tdp",
+    "proyectos",
   ],
   restaurant: [
     "dashboard_restaurant",
@@ -751,7 +753,7 @@ export default function App() {
             activeView={activeView}
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
-            allowedRoles={["superadmin", "admin", "sales"]}
+            allowedRoles={["superadmin", "admin", "director", "project_manager", "sales", "developer"]}
             userRole={userRole}
           />
           <NavItem
