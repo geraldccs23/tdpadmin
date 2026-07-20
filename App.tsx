@@ -97,6 +97,9 @@ import { ProyectosModule } from "./pages/ProyectosModule";
 import { CotizacionesModule } from "./pages/CotizacionesModule";
 import { SupportModule } from "./pages/SupportModule";
 import { InvoicesModule } from "./pages/InvoicesModule";
+import { CobranzaModule } from "./pages/CobranzaModule";
+import { HorasModule } from "./pages/HorasModule";
+import { ContratosModule } from "./pages/ContratosModule";
 
 type View =
   | "dashboard"
@@ -154,7 +157,10 @@ type View =
   | "tdp_connect"
   | "partner_dashboard"
   | "partners_admin"
-  | "invoices";
+  | "invoices"
+  | "cobranza"
+  | "horas"
+  | "contratos";
 export type Role =
   | "director"
   | "supervisor"
@@ -188,6 +194,9 @@ const rolePermissions: Record<Role, View[]> = {
     "cotizaciones",
     "support_tdp",
     "invoices",
+    "cobranza",
+    "horas",
+    "contratos",
     "settings",
     "users",
   ],
@@ -406,6 +415,9 @@ const rolePermissions: Record<Role, View[]> = {
     "partner_dashboard",
     "partners_admin",
     "invoices",
+    "cobranza",
+    "horas",
+    "contratos",
   ],
   support: [
     "dashboard",
@@ -418,6 +430,8 @@ const rolePermissions: Record<Role, View[]> = {
     "proyectos",
     "cotizaciones",
     "invoices",
+    "cobranza",
+    "contratos",
     "partner_dashboard",
   ],
   staff: [
@@ -428,6 +442,7 @@ const rolePermissions: Record<Role, View[]> = {
     "dashboard",
     "support_tdp",
     "invoices",
+    "cobranza",
   ],
   project_manager: [
     "dashboard",
@@ -792,6 +807,36 @@ export default function App() {
             isOpen={isSidebarOpen || window.innerWidth < 768}
             onClick={handleSetView}
             allowedRoles={["superadmin", "admin", "director", "sales", "finance", "project_manager"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={DollarSign}
+            label="Cobranza"
+            view="cobranza"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["superadmin", "admin", "director", "sales", "finance"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={Clock}
+            label="Horas"
+            view="horas"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["superadmin", "admin", "director", "project_manager"]}
+            userRole={userRole}
+          />
+          <NavItem
+            icon={FileText}
+            label="Contratos"
+            view="contratos"
+            activeView={activeView}
+            isOpen={isSidebarOpen || window.innerWidth < 768}
+            onClick={handleSetView}
+            allowedRoles={["superadmin", "admin", "director", "sales", "project_manager"]}
             userRole={userRole}
           />
           <NavItem
@@ -1854,6 +1899,9 @@ export default function App() {
               {activeView === "proyectos" && <ProyectosModule />}
               {activeView === "cotizaciones" && <CotizacionesModule />}
               {activeView === "invoices" && <InvoicesModule userRole={userRole || ''} />}
+              {activeView === "cobranza" && <CobranzaModule userRole={userRole || ''} />}
+              {activeView === "horas" && <HorasModule userRole={userRole || ''} />}
+              {activeView === "contratos" && <ContratosModule userRole={userRole || ''} />}
               {activeView === "support_tdp" && <SupportModule userRole={userRole || ''} />}
               {activeView === "tdp_connect" && <TDPConnectModule />}
               {activeView === "partner_dashboard" && <PartnerDashboard />}
