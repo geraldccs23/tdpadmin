@@ -5380,12 +5380,22 @@ app.post("/api/public/tickets", requirePublicToken, async (req, res) => {
     if (!title || !description || !client_email || !client_name) {
       return res.status(400).json({ ok: false, error: "faltan campos requeridos" });
     }
+
+    // Map external categories/priorities to internal values
+    const priorityMap = { low: 'low', medium: 'normal', high: 'high', urgent: 'urgent' };
+    const categoryMap = {
+      bug: 'system', feature_request: 'general', support: 'general', other: 'other',
+      web: 'web', hosting: 'hosting', email: 'email', domain: 'domain', system: 'system', billing: 'billing', general: 'general'
+    };
+    const mappedPriority = priorityMap[priority] || 'normal';
+    const mappedCategory = categoryMap[category] || 'general';
+
     const { rows } = await tdpPool.query(
       `INSERT INTO tdpadmin.support_tickets
         (title, description, status, priority, category, client_email, client_name, branch, created_at, updated_at)
-       VALUES ($1,$2,'open',COALESCE($3,'medium'),COALESCE($4,'support'),$5,$6,$7,NOW(),NOW())
+       VALUES ($1,$2,'open',$3,$4,$5,$6,$7,NOW(),NOW())
        RETURNING *`,
-      [title, description, priority, category, client_email, client_name, branch]
+      [title, description, mappedPriority, mappedCategory, client_email, client_name, branch]
     );
     res.json({ ok: true, ticket: rows[0] });
   } catch (e) {
@@ -5481,12 +5491,62 @@ app.post("/api/public/tickets/:id/messages", requirePublicToken, async (req, res
   }
 });
 
+// Update ticket (status only)
+app.patch("/api/public/tickets/:id", requirePublicToken, async (req, res) => {
+  try {
+    const { status, priority } = req.body;
+    const sets = [];
+    const params = [];
+    let idx = 0;
+    if (status) {
+      const allowed = ['open','in_progress','resolved','closed','cancelled'];
+      if (!allowed.includes(status)) return res.status(400).json({ ok: false, error: "status inválido" });
+      idx++; sets.push(`status = $${idx}`); params.push(status);
+    }
+    if (priority) {
+      const allowed = ['low','normal','high','urgent'];
+      if (!allowed.includes(priority)) return res.status(400).json({ ok: false, error: "priority inválido" });
+      idx++; sets.push(`priority = $${idx}`); params.push(priority);
+    }
+    if (sets.length === 0) return res.status(400).json({ ok: false, error: "nada que actualizar" });
+    sets.push(`updated_at = NOW()`);
+    idx++; params.push(req.params.id);
+    const { rows } = await tdpPool.query(
+      `UPDATE tdpadmin.support_tickets SET ${sets.join(", ")} WHERE id = $${idx} RETURNING *`,
+      params
+    );
+    if (rows.length === 0) return res.status(404).json({ ok: false, error: "ticket no encontrado" });
+    res.json({ ok: true, ticket: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+// Upload image (base64 → local file)
+const PUBLIC_UPLOAD_DIR = process.env.PUBLIC_UPLOAD_DIR || "./public_uploads";
+if (!fs.existsSync(PUBLIC_UPLOAD_DIR)) fs.mkdirSync(PUBLIC_UPLOAD_DIR, { recursive: true });
+
+app.post("/api/public/upload", requirePublicToken, async (req, res) => {
+  try {
+    const { file_data, file_name } = req.body || {};
+    if (!file_data) return res.status(400).json({ ok: false, error: "file_data requerido (base64)" });
+    const ext = (file_name || "file.png").split(".").pop();
+    const storedName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const buffer = Buffer.from(file_data, "base64");
+    fs.writeFileSync(path.join(PUBLIC_UPLOAD_DIR, storedName), buffer);
+    res.json({ ok: true, url: `/public_uploads/${storedName}` });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
 // =============================================================================
 // Start server
 // =============================================================================
 
 // Serve static files (landing page, etc.)
 app.use(express.static("public"));
+app.use("/public_uploads", express.static(PUBLIC_UPLOAD_DIR));
 
 // Root serves landing
 app.get("/", (req, res) => {
