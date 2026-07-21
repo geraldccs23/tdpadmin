@@ -361,7 +361,7 @@ app.get("/api/tdp/support/tickets", requireTDPAuth, async (req, res) => {
       sql += ` AND t.client_id = $${params.length}`;
     }
 
-    for (const key of ["status", "priority", "client_id", "assigned_to"]) {
+    for (const key of ["status", "priority", "client_id", "assigned_to", "source"]) {
       if (req.query[key]) {
         params.push(req.query[key]);
         sql += ` AND t.${key} = $${params.length}`;
@@ -5906,7 +5906,8 @@ app.get("/api/tdp/dashboard/summary", requireTDPAuth, async (req, res) => {
 });
 
 // =============================================================================
-// Public endpoints (token-based auth for external systems like RG7)
+// Public endpoints (token-based auth for external integrations)
+// Todas las implementaciones cliente se conectan aquí.
 // =============================================================================
 
 function requirePublicToken(req, res, next) {
@@ -5917,12 +5918,22 @@ function requirePublicToken(req, res, next) {
   next();
 }
 
-// Create ticket from external client
+// Helper: resolve client_id from email
+async function resolveClientId(email) {
+  if (!email) return null;
+  const { rows } = await tdpPool.query(
+    "SELECT id, name FROM tdpadmin.clients WHERE email = $1 LIMIT 1",
+    [email]
+  );
+  return rows.length > 0 ? rows[0].id : null;
+}
+
+// POST /api/public/tickets — create ticket from external implementation
 app.post("/api/public/tickets", requirePublicToken, async (req, res) => {
   try {
-    const { title, description, priority, category, client_email, client_name, branch } = req.body;
-    if (!title || !description || !client_email || !client_name) {
-      return res.status(400).json({ ok: false, error: "faltan campos requeridos" });
+    const { title, description, priority, category, client_email, client_name, source_implementation } = req.body;
+    if (!title || !client_email || !client_name) {
+      return res.status(400).json({ ok: false, error: "title, client_email y client_name requeridos" });
     }
 
     // Map external categories/priorities to internal values
@@ -5934,12 +5945,15 @@ app.post("/api/public/tickets", requirePublicToken, async (req, res) => {
     const mappedPriority = priorityMap[priority] || 'normal';
     const mappedCategory = categoryMap[category] || 'general';
 
+    // Auto-resolve client_id from email
+    const clientId = await resolveClientId(client_email);
+
     const { rows } = await tdpPool.query(
       `INSERT INTO tdpadmin.support_tickets
-        (title, description, status, priority, category, client_email, client_name, branch, created_at, updated_at)
-       VALUES ($1,$2,'open',$3,$4,$5,$6,$7,NOW(),NOW())
+        (client_id, title, description, status, priority, category, source, source_implementation, client_email, client_name, created_at, updated_at)
+       VALUES ($1,$2,$3,'open',$4,$5,'api',$6,$7,$8,NOW(),NOW())
        RETURNING *`,
-      [title, description, mappedPriority, mappedCategory, client_email, client_name, branch]
+      [clientId, title, description || '', mappedPriority, mappedCategory, source_implementation || '', client_email, client_name]
     );
     res.json({ ok: true, ticket: rows[0] });
   } catch (e) {
@@ -5947,7 +5961,7 @@ app.post("/api/public/tickets", requirePublicToken, async (req, res) => {
   }
 });
 
-// List tickets by client email
+// GET /api/public/tickets — list tickets by client email
 app.get("/api/public/tickets", requirePublicToken, async (req, res) => {
   try {
     const { client_email } = req.query;
@@ -5955,7 +5969,9 @@ app.get("/api/public/tickets", requirePublicToken, async (req, res) => {
       return res.status(400).json({ ok: false, error: "client_email requerido" });
     }
     const { rows } = await tdpPool.query(
-      `SELECT t.*, COALESCE(u.full_name,'') as assigned_name
+      `SELECT t.id, t.ticket_number, t.title, t.status, t.priority, t.category, t.source, t.source_implementation,
+              t.client_email, t.client_name, t.created_at, t.updated_at,
+              COALESCE(u.full_name,'') as assigned_name
        FROM tdpadmin.support_tickets t
        LEFT JOIN tdpadmin.users u ON u.id = t.assigned_to
        WHERE t.client_email = $1
@@ -5968,15 +5984,20 @@ app.get("/api/public/tickets", requirePublicToken, async (req, res) => {
   }
 });
 
-// Get single ticket
+// GET /api/public/tickets/:id — get single ticket (validated by client_email)
 app.get("/api/public/tickets/:id", requirePublicToken, async (req, res) => {
   try {
+    const { client_email } = req.query;
+    if (!client_email) return res.status(400).json({ ok: false, error: "client_email requerido" });
+
     const { rows } = await tdpPool.query(
-      `SELECT t.*, COALESCE(u.full_name,'') as assigned_name
+      `SELECT t.id, t.ticket_number, t.title, t.description, t.status, t.priority, t.category, t.source, t.source_implementation,
+              t.client_email, t.client_name, t.created_at, t.updated_at, t.closed_at,
+              COALESCE(u.full_name,'') as assigned_name
        FROM tdpadmin.support_tickets t
        LEFT JOIN tdpadmin.users u ON u.id = t.assigned_to
-       WHERE t.id = $1`,
-      [req.params.id]
+       WHERE t.id = $1 AND t.client_email = $2`,
+      [req.params.id, client_email]
     );
     if (rows.length === 0) return res.status(404).json({ ok: false, error: "ticket no encontrado" });
     res.json({ ok: true, ticket: rows[0] });
@@ -5985,47 +6006,66 @@ app.get("/api/public/tickets/:id", requirePublicToken, async (req, res) => {
   }
 });
 
-// Get messages for a ticket
+// GET /api/public/tickets/:id/messages — get messages (client cannot see internal notes)
 app.get("/api/public/tickets/:id/messages", requirePublicToken, async (req, res) => {
   try {
+    const { client_email } = req.query;
+    if (!client_email) return res.status(400).json({ ok: false, error: "client_email requerido" });
+
+    // Verify ticket belongs to this client
+    const { rows: ticketCheck } = await tdpPool.query(
+      "SELECT id FROM tdpadmin.support_tickets WHERE id = $1 AND client_email = $2",
+      [req.params.id, client_email]
+    );
+    if (ticketCheck.length === 0) return res.status(404).json({ ok: false, error: "ticket no encontrado" });
+
     const { rows } = await tdpPool.query(
-      `SELECT m.*, COALESCE(u.full_name,'') as sender_name
-       FROM tdpadmin.support_messages m
-       LEFT JOIN tdpadmin.users u ON u.id = m.sender_id
-       WHERE m.ticket_id = $1
+      `SELECT m.id, m.author_type, m.author_id, m.message, m.created_at,
+              COALESCE(u.full_name, m.author_type) as sender_name
+       FROM tdpadmin.support_ticket_messages m
+       LEFT JOIN tdpadmin.users u ON u.id = m.author_id
+       WHERE m.ticket_id = $1 AND m.is_internal = false
        ORDER BY m.created_at ASC`,
       [req.params.id]
     );
-    res.json({ ok: true, messages: rows });
+    // Parse messages that might be JSON strings (legacy format)
+    const parsed = rows.map(m => {
+      try {
+        const parsed = JSON.parse(m.message);
+        if (parsed.text) return { ...m, message: parsed.text, sender_name: parsed.author || m.sender_name };
+      } catch (_) {}
+      return m;
+    });
+    res.json({ ok: true, messages: parsed });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
 });
 
-// Add message to ticket
+// POST /api/public/tickets/:id/messages — send message as client
 app.post("/api/public/tickets/:id/messages", requirePublicToken, async (req, res) => {
   try {
-    const { message } = req.body;
-    if (!message) {
-      return res.status(400).json({ ok: false, error: "message requerido" });
-    }
+    const { client_email, message } = req.body;
+    if (!message) return res.status(400).json({ ok: false, error: "message requerido" });
+    if (!client_email) return res.status(400).json({ ok: false, error: "client_email requerido" });
+
+    // Verify ticket belongs to this client
     const { rows: ticketRows } = await tdpPool.query(
-      "SELECT id, client_name, client_email FROM tdpadmin.support_tickets WHERE id = $1",
-      [req.params.id]
+      "SELECT id, status FROM tdpadmin.support_tickets WHERE id = $1 AND client_email = $2",
+      [req.params.id, client_email]
     );
     if (ticketRows.length === 0) return res.status(404).json({ ok: false, error: "ticket no encontrado" });
 
-    const msg = JSON.stringify({ text: message, author: ticketRows[0].client_name });
     const { rows } = await tdpPool.query(
-      `INSERT INTO tdpadmin.support_messages (ticket_id, sender_id, sender_email, message, created_at)
-       VALUES ($1, NULL, $2, $3, NOW())
-       RETURNING *`,
-      [req.params.id, ticketRows[0].client_email, msg]
+      `INSERT INTO tdpadmin.support_ticket_messages (ticket_id, author_id, author_type, message, is_internal, created_at)
+       VALUES ($1, NULL, 'client', $2, false, NOW())
+       RETURNING id, author_type, message, created_at`,
+      [req.params.id, message]
     );
 
-    // Reopen ticket if closed
+    // Reopen ticket if it was closed/resolved/waiting_client
     await tdpPool.query(
-      "UPDATE tdpadmin.support_tickets SET status = 'in_progress', updated_at = NOW() WHERE id = $1 AND status = 'closed'",
+      "UPDATE tdpadmin.support_tickets SET status = 'waiting_internal', updated_at = NOW() WHERE id = $1 AND status IN ('closed','resolved','waiting_client')",
       [req.params.id]
     );
 
@@ -6035,16 +6075,18 @@ app.post("/api/public/tickets/:id/messages", requirePublicToken, async (req, res
   }
 });
 
-// Update ticket (status only)
+// PATCH /api/public/tickets/:id — update status/priority (client-facing)
 app.patch("/api/public/tickets/:id", requirePublicToken, async (req, res) => {
   try {
-    const { status, priority } = req.body;
+    const { client_email, status, priority } = req.body;
+    if (!client_email) return res.status(400).json({ ok: false, error: "client_email requerido" });
+
     const sets = [];
     const params = [];
     let idx = 0;
     if (status) {
-      const allowed = ['open','in_progress','resolved','closed','cancelled'];
-      if (!allowed.includes(status)) return res.status(400).json({ ok: false, error: "status inválido" });
+      const allowed = ['open','resolved','closed'];
+      if (!allowed.includes(status)) return res.status(400).json({ ok: false, error: "status inválido. Permitidos: open, resolved, closed" });
       idx++; sets.push(`status = $${idx}`); params.push(status);
     }
     if (priority) {
@@ -6055,8 +6097,9 @@ app.patch("/api/public/tickets/:id", requirePublicToken, async (req, res) => {
     if (sets.length === 0) return res.status(400).json({ ok: false, error: "nada que actualizar" });
     sets.push(`updated_at = NOW()`);
     idx++; params.push(req.params.id);
+    idx++; params.push(client_email);
     const { rows } = await tdpPool.query(
-      `UPDATE tdpadmin.support_tickets SET ${sets.join(", ")} WHERE id = $${idx} RETURNING *`,
+      `UPDATE tdpadmin.support_tickets SET ${sets.join(", ")} WHERE id = $${idx-1} AND client_email = $${idx} RETURNING *`,
       params
     );
     if (rows.length === 0) return res.status(404).json({ ok: false, error: "ticket no encontrado" });
@@ -6066,7 +6109,7 @@ app.patch("/api/public/tickets/:id", requirePublicToken, async (req, res) => {
   }
 });
 
-// Upload image (base64 → local file)
+// POST /api/public/upload — upload file (base64 → local)
 const PUBLIC_UPLOAD_DIR = process.env.PUBLIC_UPLOAD_DIR || "./public_uploads";
 if (!fs.existsSync(PUBLIC_UPLOAD_DIR)) fs.mkdirSync(PUBLIC_UPLOAD_DIR, { recursive: true });
 

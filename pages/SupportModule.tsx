@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, MessageSquare, Send, X, Loader2, User, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, Search, MessageSquare, Send, X, Loader2, User, Clock, CheckCircle2, AlertCircle, Globe, Smartphone, Monitor, Mail, Phone, HelpCircle } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
 function getToken() { return localStorage.getItem('tdpadmin_auth_token'); }
@@ -20,12 +20,30 @@ const STATUS_COLORS: Record<string, string> = {
 };
 const PRIORITY_ORDER: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
 
+const SOURCE_BADGES: Record<string, { color: string; icon: React.ElementType; label: string }> = {
+  portal: { color: 'bg-[#009FE3]/10 text-[#009FE3]', icon: Monitor, label: 'Portal TDP' },
+  api: { color: 'bg-green-100 text-green-700', icon: Globe, label: 'API' },
+  widget: { color: 'bg-purple-100 text-purple-700', icon: Smartphone, label: 'Widget' },
+  internal: { color: 'bg-gray-100 text-gray-700', icon: User, label: 'Interno' },
+  whatsapp: { color: 'bg-emerald-100 text-emerald-700', icon: Phone, label: 'WhatsApp' },
+  email: { color: 'bg-blue-100 text-blue-700', icon: Mail, label: 'Email' },
+  phone: { color: 'bg-orange-100 text-orange-700', icon: Phone, label: 'Teléfono' },
+};
+
+function SourceBadge({ source }: { source: string }) {
+  const config = SOURCE_BADGES[source] || { color: 'bg-gray-100 text-gray-600', icon: HelpCircle, label: source || 'Desconocido' };
+  const Icon = config.icon;
+  return <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${config.color}`}><Icon size={12} />{config.label}</span>;
+}
+
 export function SupportModule({ userRole, clientId }: { userRole: string; clientId?: string }) {
   const [tickets, setTickets] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [clientFilter, setClientFilter] = useState('');
   const [detail, setDetail] = useState<any>(null);
   const [newMsg, setNewMsg] = useState('');
   const [sending, setSending] = useState(false);
@@ -37,6 +55,8 @@ export function SupportModule({ userRole, clientId }: { userRole: string; client
   const fetchTickets = async () => {
     setLoading(true);
     const params = new URLSearchParams({ search, status: statusFilter });
+    if (sourceFilter) params.set('source', sourceFilter);
+    if (clientFilter) params.set('client_id', clientFilter);
     const json = await api(`/api/tdp/support/tickets?${params}`);
     if (json.ok) setTickets(json.tickets || []);
     setLoading(false);
@@ -45,7 +65,7 @@ export function SupportModule({ userRole, clientId }: { userRole: string; client
   useEffect(() => {
     fetchTickets();
     if (isInternal) api('/api/tdp/crm/clients').then(j => { if (j.ok) setClients(j.clients || []); });
-  }, [search, statusFilter]);
+  }, [search, statusFilter, sourceFilter, clientFilter]);
 
   const openDetail = async (ticket: any) => {
     const json = await api(`/api/tdp/support/tickets/${ticket.id}`);
@@ -82,8 +102,8 @@ export function SupportModule({ userRole, clientId }: { userRole: string; client
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">{isInternal ? 'Central de Soporte' : 'Mis Soporte'}</h2>
-          <p className="text-sm text-gray-500 mt-1">{isInternal ? 'Gestión de tickets de clientes' : 'Consulta y creación de solicitudes de soporte'}</p>
+          <h2 className="text-2xl font-bold text-gray-800">{isInternal ? 'Central de Soporte' : 'Mi Soporte'}</h2>
+          <p className="text-sm text-gray-500 mt-1">{isInternal ? 'Todas las implementaciones' : 'Consulta y creación de solicitudes de soporte'}</p>
         </div>
         <button onClick={() => setShowForm(true)} className="flex items-center gap-2 bg-[#009FE3] text-white px-4 py-2.5 rounded-xl hover:bg-[#0088c4] text-sm font-semibold">
           <Plus size={18} /> {isInternal ? 'Nuevo ticket' : 'Crear soporte'}
@@ -99,6 +119,18 @@ export function SupportModule({ userRole, clientId }: { userRole: string; client
           <option value="">Todos los estados</option>
           {Object.keys(STATUS_COLORS).map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
         </select>
+        {isInternal && (
+          <>
+            <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} className="border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm">
+              <option value="">Todas las fuentes</option>
+              {Object.keys(SOURCE_BADGES).map(s => <option key={s} value={s}>{SOURCE_BADGES[s].label}</option>)}
+            </select>
+            <select value={clientFilter} onChange={e => setClientFilter(e.target.value)} className="border border-gray-200 rounded-xl py-2.5 px-3.5 text-sm">
+              <option value="">Todos los clientes</option>
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </>
+        )}
       </div>
 
       {showForm && (
@@ -142,8 +174,9 @@ export function SupportModule({ userRole, clientId }: { userRole: string; client
               <div>
                 <h3 className="text-lg font-bold text-gray-800">{detail.ticket_number}</h3>
                 <p className="text-sm text-gray-800 font-medium mt-0.5">{detail.title}</p>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${STATUS_COLORS[detail.status] || 'bg-gray-100 text-gray-600'}`}>{detail.status?.replace('_', ' ')}</span>
+                  {isInternal && detail.source && <SourceBadge source={detail.source} />}
                   <span className="text-xs text-gray-500">{detail.client_name || '—'}</span>
                   {detail.assigned_email && <span className="text-xs text-gray-400">Asignado: {detail.assigned_email}</span>}
                 </div>
@@ -156,7 +189,7 @@ export function SupportModule({ userRole, clientId }: { userRole: string; client
                 <div key={msg.id} className={`flex ${msg.author_type === 'client' ? 'justify-start' : 'justify-end'}`}>
                   <div className={`max-w-[80%] rounded-xl p-4 ${msg.author_type === 'client' ? 'bg-gray-100 text-gray-800' : 'bg-[#009FE3] text-white'}`}>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold opacity-70">{msg.author_type}</span>
+                      <span className="text-xs font-semibold opacity-70">{msg.author_type === 'client' ? msg.sender_name || 'Cliente' : 'Soporte TDP'}</span>
                       <span className="text-[10px] opacity-50">{new Date(msg.created_at).toLocaleString()}</span>
                     </div>
                     <p className="text-sm">{msg.message}</p>
@@ -198,14 +231,16 @@ export function SupportModule({ userRole, clientId }: { userRole: string; client
               <div key={t.id} className="p-5 hover:bg-gray-50/50 cursor-pointer transition-colors" onClick={() => openDetail(t)}>
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-xs font-mono text-gray-400">{t.ticket_number}</span>
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[t.status] || 'bg-gray-100'}`}>{t.status?.replace('_', ' ')}</span>
                       <span className={`text-[10px] font-bold uppercase ${t.priority === 'urgent' ? 'text-red-600' : t.priority === 'high' ? 'text-orange-500' : t.priority === 'normal' ? 'text-blue-500' : 'text-gray-400'}`}>{t.priority}</span>
+                      {isInternal && t.source && <SourceBadge source={t.source} />}
                     </div>
                     <h4 className="font-semibold text-gray-800 text-sm">{t.title}</h4>
                     <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
                       <span>{t.client_name}</span>
+                      {t.source_implementation && <span className="text-gray-400">· {t.source_implementation}</span>}
                       <span>{t.category}</span>
                       <span>{new Date(t.created_at).toLocaleDateString()}</span>
                     </div>
