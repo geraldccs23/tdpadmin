@@ -552,7 +552,13 @@ export default function App() {
 
   const fetchUserRole = async (userId: string | null, email: string, presetRole?: string) => {
     if (presetRole && ['director','supervisor','supervisor_ventas','supervisor_compras','administrador','cajero','vendedor','compras','soporte','delivery','supervisor_almacen','almacenista','admin','cocina','superadmin','support','sales','staff','finance','client','project_manager','developer','restaurant'].includes(presetRole)) {
-      setUserRole(presetRole as Role);
+      const role = presetRole as Role;
+      setUserRole(role);
+      setActiveView((prev) => {
+        const allowed = rolePermissions[role] || [];
+        if (!allowed.includes(prev)) return defaultViews[role] || "dashboard_restaurant";
+        return prev;
+      });
       return;
     }
     try {
